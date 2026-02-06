@@ -42,9 +42,13 @@ export class Canvas {
         this.placingComponent = null;
         this.placingComponentClass = null;
 
-        // Wire drawing
-        this.drawingWire = null;
-        this.wirePreview = null;
+        // Wire drawing - supports both click-to-connect and drag-to-connect
+        this.pendingWireTerminal = null; // First terminal clicked (for click-to-connect)
+        this.draggingWire = null; // Wire being drawn by dragging
+        this.wirePreview = null; // Preview element for drag mode
+
+        // Wire segment dragging
+        this.draggingWireSegment = null; // { wire, type: 'segment'|'waypoint', index }
 
         // Callbacks
         this.onSelectionChange = null;
@@ -105,11 +109,16 @@ export class Canvas {
         const pos = this.getMousePosition(event);
         const snapped = this.snapToGrid(pos.x, pos.y);
 
-        // Check if clicking on a terminal (start wire drawing)
+        // Check if clicking on a terminal
         const terminalHit = this.circuit.findTerminalAt(pos.x, pos.y);
         if (terminalHit) {
-            this.startWireDrawing(terminalHit.terminal);
+            this.handleTerminalClick(terminalHit.terminal);
             return;
+        }
+
+        // If we were waiting for second terminal, cancel
+        if (this.pendingWireTerminal) {
+            this.cancelWireDrawing();
         }
 
         // Check if clicking on a component
@@ -124,6 +133,9 @@ export class Canvas {
         const wire = this.circuit.findWireAt(pos.x, pos.y);
         if (wire) {
             this.selectWire(wire);
+
+            // Start dragging the wire's bend point
+            this.draggingWireSegment = { wire };
             return;
         }
 
@@ -154,9 +166,14 @@ export class Canvas {
             this.updateConnectedWires(this.selectedComponent);
         }
 
-        // Drawing wire
-        if (this.drawingWire) {
-            this.drawingWire.updatePreview(pos.x, pos.y);
+        // Dragging wire bend point (horizontal only)
+        if (this.draggingWireSegment) {
+            this.draggingWireSegment.wire.setBendX(snapped.x);
+        }
+
+        // Dragging wire (preview follows cursor)
+        if (this.draggingWire) {
+            this.draggingWire.updatePreview(pos.x, pos.y);
         }
 
         // Placing component (following cursor)
@@ -171,34 +188,36 @@ export class Canvas {
     handleMouseUp(event) {
         const pos = this.getMousePosition(event);
 
-        // End dragging
+        // End dragging component
         if (this.dragging) {
             this.dragging = false;
         }
 
-        // Complete wire drawing
-        if (this.drawingWire) {
+        // End dragging wire segment
+        if (this.draggingWireSegment) {
+            this.draggingWireSegment = null;
+        }
+
+        // Complete drag-wire if active
+        if (this.draggingWire) {
             const terminalHit = this.circuit.findTerminalAt(pos.x, pos.y);
-            if (terminalHit && terminalHit.terminal !== this.drawingWire.startTerminal) {
-                // Complete the wire
-                this.drawingWire.setEndTerminal(terminalHit.terminal);
-                this.circuit.addWire(this.drawingWire);
+            if (terminalHit && terminalHit.terminal !== this.draggingWire.startTerminal) {
+                // Complete the wire via drag
+                this.draggingWire.setEndTerminal(terminalHit.terminal);
+                this.circuit.addWire(this.draggingWire);
 
                 // Replace preview with final wire
                 if (this.wirePreview) {
                     this.wiresLayer.removeChild(this.wirePreview);
                 }
-                const wireElement = this.drawingWire.render();
+                const wireElement = this.draggingWire.render();
                 this.wiresLayer.appendChild(wireElement);
-            } else {
-                // Cancel wire drawing
-                if (this.wirePreview) {
-                    this.wiresLayer.removeChild(this.wirePreview);
-                }
-            }
 
-            this.drawingWire = null;
-            this.wirePreview = null;
+                // Clear all wire drawing state (both click and drag)
+                this.cancelWireDrawing();
+            }
+            // If not dropped on a valid terminal, keep the click-to-connect active
+            // The user can still click a second terminal
         }
 
         // Place component
@@ -242,6 +261,7 @@ export class Canvas {
                 break;
             case 'Escape':
                 this.cancelPlacement();
+                this.cancelWireDrawing();
                 this.deselectAll();
                 break;
             case 'r':
@@ -308,13 +328,60 @@ export class Canvas {
     }
 
     /**
-     * Start wire drawing
+     * Handle terminal click/drag for wires
+     * Supports both click-to-connect and drag-to-connect
      */
-    startWireDrawing(terminal) {
-        this.mode = 'wire';
-        this.drawingWire = new Wire(terminal, null);
-        this.wirePreview = this.drawingWire.render(true);
-        this.wiresLayer.appendChild(this.wirePreview);
+    handleTerminalClick(terminal) {
+        if (!this.pendingWireTerminal) {
+            // First click - store terminal for click-to-connect
+            this.pendingWireTerminal = terminal;
+            this.mode = 'wire';
+            this.updateStatusMode();
+
+            // Highlight the selected terminal
+            if (terminal.element) {
+                terminal.element.classList.add('terminal-selected');
+            }
+
+            // Also start drag-wire for drag-to-connect
+            this.draggingWire = new Wire(terminal, null);
+            this.wirePreview = this.draggingWire.render(true);
+            this.wiresLayer.appendChild(this.wirePreview);
+        } else {
+            // Second click - complete the wire via click-to-connect
+            if (terminal !== this.pendingWireTerminal) {
+                // Create wire between terminals
+                const wire = new Wire(this.pendingWireTerminal, terminal);
+                this.circuit.addWire(wire);
+
+                // Render wire
+                const wireElement = wire.render();
+                this.wiresLayer.appendChild(wireElement);
+            }
+
+            // Clear pending state
+            this.cancelWireDrawing();
+        }
+    }
+
+    /**
+     * Cancel wire drawing (both click and drag modes)
+     */
+    cancelWireDrawing() {
+        // Clear click-to-connect state
+        if (this.pendingWireTerminal && this.pendingWireTerminal.element) {
+            this.pendingWireTerminal.element.classList.remove('terminal-selected');
+        }
+        this.pendingWireTerminal = null;
+
+        // Clear drag-to-connect state
+        if (this.wirePreview && this.wirePreview.parentNode) {
+            this.wirePreview.parentNode.removeChild(this.wirePreview);
+        }
+        this.draggingWire = null;
+        this.wirePreview = null;
+
+        this.mode = 'select';
         this.updateStatusMode();
     }
 

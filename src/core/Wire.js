@@ -21,12 +21,21 @@ export class Wire {
         // Path points for routing (start, bends, end)
         this.points = [];
 
+        // Offset for the bend point (user can drag to shift the bend left/right)
+        // null = auto (centered between terminals)
+        this.bendOffset = null;
+
         // Register with terminals
         if (startTerminal) {
             startTerminal.connect(this);
         }
         if (endTerminal) {
             endTerminal.connect(this);
+        }
+
+        // Initialize path if both terminals are set
+        if (startTerminal && endTerminal) {
+            this.updatePath();
         }
     }
 
@@ -65,7 +74,8 @@ export class Wire {
     }
 
     /**
-     * Calculate wire path points (simple L-routing for now)
+     * Calculate wire path points
+     * Uses bendOffset if set, otherwise auto-centers
      */
     updatePath() {
         if (!this.startTerminal) return;
@@ -73,17 +83,52 @@ export class Wire {
         const start = this.startTerminal.getPosition();
         const end = this.endTerminal ? this.endTerminal.getPosition() : start;
 
-        // Simple Manhattan routing (horizontal first, then vertical)
-        const midX = (start.x + end.x) / 2;
+        // Calculate bend X position
+        let bendX;
+        if (this.bendOffset !== null) {
+            bendX = this.bendOffset;
+        } else {
+            // Auto-center between terminals
+            bendX = (start.x + end.x) / 2;
+        }
 
+        // Manhattan routing: horizontal, vertical, horizontal
         this.points = [
             { x: start.x, y: start.y },
-            { x: midX, y: start.y },
-            { x: midX, y: end.y },
+            { x: bendX, y: start.y },
+            { x: bendX, y: end.y },
             { x: end.x, y: end.y }
         ];
 
         this.updateElement();
+    }
+
+    /**
+     * Set the bend X position (for dragging)
+     */
+    setBendX(x) {
+        this.bendOffset = x;
+        this.updatePath();
+    }
+
+    /**
+     * Get current bend X position
+     */
+    getBendX() {
+        if (this.bendOffset !== null) {
+            return this.bendOffset;
+        }
+        const start = this.startTerminal.getPosition();
+        const end = this.endTerminal ? this.endTerminal.getPosition() : start;
+        return (start.x + end.x) / 2;
+    }
+
+    /**
+     * Reset to auto-routing (clear custom bend)
+     */
+    resetRouting() {
+        this.bendOffset = null;
+        this.updatePath();
     }
 
     /**

@@ -51,41 +51,7 @@ export class PropertyPanel {
         `;
         this.content.appendChild(header);
 
-        // Get property definitions
-        const definitions = component.constructor.getPropertyDefinitions();
-
-        if (definitions.length === 0) {
-            const noProps = document.createElement('p');
-            noProps.className = 'placeholder-text';
-            noProps.textContent = 'No editable properties';
-            this.content.appendChild(noProps);
-        } else {
-            // Create form fields for each property
-            for (const def of definitions) {
-                const field = this.createPropertyField(component, def);
-                this.content.appendChild(field);
-            }
-        }
-
-        // Position info
-        const posInfo = document.createElement('div');
-        posInfo.className = 'property-field position-info';
-        posInfo.innerHTML = `
-            <label>Position</label>
-            <span class="position-value">X: ${component.x}, Y: ${component.y}</span>
-        `;
-        this.content.appendChild(posInfo);
-
-        // Rotation info
-        const rotInfo = document.createElement('div');
-        rotInfo.className = 'property-field';
-        rotInfo.innerHTML = `
-            <label>Rotation</label>
-            <span class="rotation-value">${component.rotation}°</span>
-        `;
-        this.content.appendChild(rotInfo);
-
-        // Action buttons
+        // Action buttons (at top for easy access)
         const actions = document.createElement('div');
         actions.className = 'property-actions';
 
@@ -108,6 +74,46 @@ export class PropertyPanel {
         actions.appendChild(rotateBtn);
         actions.appendChild(deleteBtn);
         this.content.appendChild(actions);
+
+        // Get property definitions
+        const definitions = component.constructor.getPropertyDefinitions();
+
+        if (definitions.length === 0) {
+            const noProps = document.createElement('p');
+            noProps.className = 'placeholder-text';
+            noProps.textContent = 'No editable properties';
+            this.content.appendChild(noProps);
+        } else {
+            // Create form fields for each property (with condition check)
+            for (const def of definitions) {
+                // Check if this property has a condition
+                if (def.condition) {
+                    // Evaluate condition against component properties
+                    const conditionMet = this.evaluateCondition(def.condition, component.properties);
+                    if (!conditionMet) continue;
+                }
+                const field = this.createPropertyField(component, def);
+                this.content.appendChild(field);
+            }
+        }
+
+        // Position info
+        const posInfo = document.createElement('div');
+        posInfo.className = 'property-field position-info';
+        posInfo.innerHTML = `
+            <label>Position</label>
+            <span class="position-value">X: ${component.x}, Y: ${component.y}</span>
+        `;
+        this.content.appendChild(posInfo);
+
+        // Rotation info
+        const rotInfo = document.createElement('div');
+        rotInfo.className = 'property-field';
+        rotInfo.innerHTML = `
+            <label>Rotation</label>
+            <span class="rotation-value">${component.rotation}°</span>
+        `;
+        this.content.appendChild(rotInfo);
     }
 
     /**
@@ -175,6 +181,11 @@ export class PropertyPanel {
             }
 
             component.setProperty(definition.name, value);
+
+            // Refresh panel if changing a property that affects conditions (like 'type')
+            if (definition.name === 'type') {
+                this.showComponent(component);
+            }
         };
 
         input.addEventListener('change', updateValue);
@@ -192,6 +203,32 @@ export class PropertyPanel {
     }
 
     /**
+     * Evaluate a condition string against component properties
+     * @param {string} condition - e.g. 'type === "ac"'
+     * @param {Object} properties - Component properties
+     * @returns {boolean}
+     */
+    evaluateCondition(condition, properties) {
+        try {
+            // Simple evaluation for common patterns
+            // Format: "propertyName === 'value'" or "propertyName !== 'value'"
+            const match = condition.match(/(\w+)\s*(===|!==)\s*["']?(\w+)["']?/);
+            if (match) {
+                const [, propName, operator, value] = match;
+                const propValue = properties[propName];
+                if (operator === '===') {
+                    return propValue === value;
+                } else if (operator === '!==') {
+                    return propValue !== value;
+                }
+            }
+            return true;
+        } catch {
+            return true;
+        }
+    }
+
+    /**
      * Refresh current component display
      */
     refresh() {
@@ -200,3 +237,4 @@ export class PropertyPanel {
         }
     }
 }
+
