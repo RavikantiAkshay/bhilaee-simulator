@@ -1,0 +1,662 @@
+/* =====================================================
+   Circuit Simulator - Design System & Styles
+   ===================================================== */
+
+/* ----- CSS Custom Properties (Design Tokens) ----- */
+:root {
+    /* Colors - Dark Theme (LTSpice-inspired) */
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --bg-elevated: #2d333b;
+    
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    
+    --accent-primary: #58a6ff;
+    --accent-secondary: #3fb950;
+    --accent-warning: #d29922;
+    --accent-danger: #f85149;
+    
+    --border-primary: #30363d;
+    --border-secondary: #21262d;
+    
+    /* Grid colors */
+    --grid-line: rgba(48, 54, 61, 0.6);
+    --grid-line-major: rgba(88, 166, 255, 0.15);
+    --grid-bg: #0d1117;
+    
+    /* Component colors */
+    --component-stroke: #58a6ff;
+    --component-fill: rgba(88, 166, 255, 0.1);
+    --component-selected: #3fb950;
+    --wire-color: #f0883e;
+    --node-color: #58a6ff;
+    
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    
+    /* Typography */
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-md: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    
+    /* Layout */
+    --header-height: 56px;
+    --toolbar-width: 200px;
+    --right-panel-width: 300px;
+    --status-bar-height: 28px;
+    
+    /* Effects */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+}
+
+/* ----- Reset & Base ----- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: var(--font-primary);
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ----- App Layout ----- */
+#app {
+    display: grid;
+    grid-template-rows: var(--header-height) 1fr var(--status-bar-height);
+    height: 100vh;
+    width: 100vw;
+}
+
+/* ----- Header ----- */
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing-lg);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    z-index: 100;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.logo-icon {
+    width: 28px;
+    height: 28px;
+    color: var(--accent-primary);
+    filter: drop-shadow(0 0 8px rgba(88, 166, 255, 0.4));
+}
+
+.logo-text {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header-nav {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* ----- Buttons ----- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-family: var(--font-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent-primary), #1f6feb);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(88, 166, 255, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #79b8ff, var(--accent-primary));
+    box-shadow: 0 4px 16px rgba(88, 166, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--bg-elevated);
+    border-color: var(--accent-primary);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ----- Main Content ----- */
+.app-main {
+    display: grid;
+    grid-template-columns: var(--toolbar-width) 1fr var(--right-panel-width);
+    overflow: hidden;
+}
+
+/* ----- Toolbar (Left Panel) ----- */
+.toolbar {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-primary);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.toolbar-title {
+    padding: var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.component-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+/* Component items in toolbar */
+.component-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    cursor: grab;
+    transition: all var(--transition-fast);
+}
+
+.component-item:hover {
+    background: var(--bg-elevated);
+    border-color: var(--accent-primary);
+    transform: translateX(4px);
+}
+
+.component-item:active {
+    cursor: grabbing;
+}
+
+.component-item svg {
+    width: 32px;
+    height: 24px;
+    color: var(--component-stroke);
+}
+
+.component-item .component-name {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+}
+
+.component-item .component-shortcut {
+    margin-left: auto;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+/* ----- Canvas Container ----- */
+.canvas-container {
+    position: relative;
+    overflow: hidden;
+    background: var(--grid-bg);
+}
+
+.circuit-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.grid-background {
+    pointer-events: none;
+}
+
+/* Canvas controls */
+.canvas-controls {
+    position: absolute;
+    bottom: var(--spacing-md);
+    right: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xs);
+    box-shadow: var(--shadow-md);
+}
+
+.canvas-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.canvas-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent-primary);
+}
+
+.canvas-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ----- Right Panel ----- */
+.right-panel {
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-primary);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.panel-title {
+    padding: var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    background: var(--bg-tertiary);
+}
+
+/* Property Panel */
+.property-panel {
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.property-content {
+    padding: var(--spacing-md);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.placeholder-text {
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    font-style: italic;
+}
+
+/* Property form fields */
+.property-field {
+    margin-bottom: var(--spacing-md);
+}
+
+.property-field label {
+    display: block;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.property-field input,
+.property-field select {
+    width: 100%;
+    padding: var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    transition: border-color var(--transition-fast);
+}
+
+.property-field input:focus,
+.property-field select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* Simulation Panel */
+.simulation-panel {
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.simulation-controls {
+    padding: var(--spacing-md);
+}
+
+.control-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.control-group label {
+    display: block;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.select-input,
+.number-input {
+    width: 100%;
+    padding: var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    transition: border-color var(--transition-fast);
+}
+
+.select-input:focus,
+.number-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.sim-buttons {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.sim-buttons .btn {
+    flex: 1;
+    min-width: 70px;
+    justify-content: center;
+}
+
+.btn-run {
+    min-width: 100%;
+}
+
+/* Output Panel */
+.output-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.output-content {
+    flex: 1;
+    padding: var(--spacing-md);
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+}
+
+/* Output results styling */
+.output-result {
+    margin-bottom: var(--spacing-md);
+}
+
+.output-result .result-label {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.output-result .result-value {
+    color: var(--accent-secondary);
+    font-weight: 500;
+}
+
+/* ----- Status Bar ----- */
+.status-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    padding: 0 var(--spacing-md);
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-primary);
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+/* ----- Scrollbar Styling ----- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* ----- SVG Component Styles ----- */
+.component-group {
+    cursor: move;
+    transition: filter var(--transition-fast);
+}
+
+.component-group:hover {
+    filter: brightness(1.2);
+}
+
+.component-group.selected {
+    filter: drop-shadow(0 0 4px var(--component-selected));
+}
+
+.component-group .component-body {
+    fill: var(--component-fill);
+    stroke: var(--component-stroke);
+    stroke-width: 2;
+}
+
+.component-group.selected .component-body {
+    stroke: var(--component-selected);
+}
+
+.component-group .terminal {
+    fill: var(--node-color);
+    stroke: var(--bg-primary);
+    stroke-width: 1;
+    cursor: crosshair;
+}
+
+.component-group .terminal:hover {
+    fill: var(--accent-secondary);
+    transform: scale(1.3);
+}
+
+.component-group .component-label {
+    fill: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
+.component-group .component-value {
+    fill: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
+/* Wire styles */
+.wire {
+    fill: none;
+    stroke: var(--wire-color);
+    stroke-width: 2;
+    stroke-linecap: round;
+    cursor: pointer;
+    transition: stroke-width var(--transition-fast);
+}
+
+.wire:hover {
+    stroke-width: 3;
+}
+
+.wire.selected {
+    stroke: var(--component-selected);
+    stroke-width: 3;
+}
+
+/* Wire preview while drawing */
+.wire-preview {
+    fill: none;
+    stroke: var(--wire-color);
+    stroke-width: 2;
+    stroke-dasharray: 5, 5;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Node junction point */
+.junction-node {
+    fill: var(--wire-color);
+    stroke: var(--bg-primary);
+    stroke-width: 1;
+}
+
+/* Selection box */
+.selection-box {
+    fill: rgba(88, 166, 255, 0.1);
+    stroke: var(--accent-primary);
+    stroke-width: 1;
+    stroke-dasharray: 4, 2;
+}
+
+/* ----- Animations ----- */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes glow {
+    0%, 100% { filter: drop-shadow(0 0 4px var(--accent-primary)); }
+    50% { filter: drop-shadow(0 0 8px var(--accent-primary)); }
+}
+
+.simulating .component-group {
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* Running indicator */
+.status-running {
+    color: var(--accent-secondary);
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* ----- Responsive Adjustments ----- */
+@media (max-width: 1200px) {
+    :root {
+        --toolbar-width: 180px;
+        --right-panel-width: 260px;
+    }
+}
+
+@media (max-width: 900px) {
+    .app-main {
+        grid-template-columns: 60px 1fr 220px;
+    }
+    
+    .toolbar-title,
+    .component-name {
+        display: none;
+    }
+    
+    .component-item {
+        justify-content: center;
+        padding: var(--spacing-sm);
+    }
+    
+    .component-shortcut {
+        display: none;
+    }
+}
