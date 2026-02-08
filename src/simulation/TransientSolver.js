@@ -63,8 +63,22 @@ export class TransientSolver {
             for (const node of this.nodes) {
                 this.results.set(node, []);
             }
+            // Track voltage source currents
             for (const vs of this.voltageSources) {
                 this.results.set(vs.id + '_I', []);
+            }
+            // Track resistor and capacitor currents
+            const components = this.circuit.getAllComponents();
+            this.resistors = [];
+            this.capacitors = [];
+            for (const comp of components) {
+                if (comp.constructor.name === 'Resistor') {
+                    this.resistors.push(comp);
+                    this.results.set(comp.id + '_I', []);
+                } else if (comp.constructor.name === 'Capacitor') {
+                    this.capacitors.push(comp);
+                    this.results.set(comp.id + '_I', []);
+                }
             }
 
             console.log(`=== Transient Analysis: 0 to ${endTime * 1000}ms, step=${timeStep * 1e6}µs ===`);
@@ -79,9 +93,32 @@ export class TransientSolver {
                 for (let i = 0; i < this.nodes.length; i++) {
                     this.results.get(this.nodes[i]).push(solution[i]);
                 }
+                // Voltage source currents
                 for (let i = 0; i < this.voltageSources.length; i++) {
                     const vs = this.voltageSources[i];
                     this.results.get(vs.id + '_I').push(solution[this.nodes.length + i]);
+                }
+                // Calculate and store resistor currents (I = V/R)
+                for (const r of this.resistors) {
+                    const [t1, t2] = r.terminals;
+                    const n1 = this.getNodeIndex(t1);
+                    const n2 = this.getNodeIndex(t2);
+                    const v1 = n1 !== null ? solution[n1] : 0;
+                    const v2 = n2 !== null ? solution[n2] : 0;
+                    const current = (v1 - v2) / r.properties.resistance;
+                    this.results.get(r.id + '_I').push(current);
+                }
+                // Calculate and store capacitor currents (I = C * dv/dt)
+                for (const c of this.capacitors) {
+                    const [t1, t2] = c.terminals;
+                    const n1 = this.getNodeIndex(t1);
+                    const n2 = this.getNodeIndex(t2);
+                    const v1 = n1 !== null ? solution[n1] : 0;
+                    const v2 = n2 !== null ? solution[n2] : 0;
+                    const vNow = v1 - v2;
+                    const vPrev = this.capacitorVoltages.get(c.id) || 0;
+                    const current = c.properties.capacitance * (vNow - vPrev) / this.timeStep;
+                    this.results.get(c.id + '_I').push(current);
                 }
 
                 // Update component states

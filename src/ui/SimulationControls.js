@@ -6,6 +6,7 @@
 
 import { MNASolver } from '../simulation/MNASolver.js';
 import { TransientSolver } from '../simulation/TransientSolver.js';
+import { SimpleChart } from './SimpleChart.js';
 
 export class SimulationControls {
     /**
@@ -26,6 +27,10 @@ export class SimulationControls {
 
         // Output panel
         this.outputContent = document.getElementById('output-content');
+        this.chartOverlay = document.getElementById('chart-overlay');
+        this.chartContainer = document.getElementById('chart-container');
+        this.chartClose = document.getElementById('chart-close');
+        this.chart = null;
 
         // State
         this.running = false;
@@ -52,6 +57,10 @@ export class SimulationControls {
 
         if (this.btnReset) {
             this.btnReset.addEventListener('click', () => this.reset());
+        }
+
+        if (this.chartClose) {
+            this.chartClose.addEventListener('click', () => this.hideChart());
         }
     }
 
@@ -107,10 +116,19 @@ export class SimulationControls {
             return;
         }
 
-        // Format results for display
+        // Format results for display - filter out voltage source terminals
         const voltages = {};
         for (const [nodeId, voltage] of result.nodeVoltages) {
-            // Clean up node ID for display
+            // Skip voltage source positive/negative terminals (not useful to show)
+            if (nodeId.includes('_positive') || nodeId.includes('_negative')) {
+                // Check if this is a voltage source
+                const match = nodeId.match(/^comp_(\d+)_/);
+                if (match) {
+                    const compId = `comp_${match[1]}`;
+                    const comp = this.circuit.components?.get(compId);
+                    if (comp?.constructor.name === 'VoltageSource') continue;
+                }
+            }
             const displayName = this.formatNodeName(nodeId);
             voltages[displayName] = voltage;
         }
@@ -118,10 +136,13 @@ export class SimulationControls {
         const currents = {};
         for (const [compId, current] of result.branchCurrents) {
             const displayName = this.formatComponentName(compId);
-            currents[displayName] = current;
+            currents[displayName] = Math.abs(current); // Use absolute value
         }
 
         this.displayResults({ voltages, currents });
+
+        // Hide chart for DC (no time series)
+        this.hideChart();
     }
 
     /**
@@ -232,48 +253,136 @@ export class SimulationControls {
         html += `<div class="result-section"><h4>Transient Analysis</h4>`;
         html += `<p>Simulated ${numPoints} points from 0 to ${endTime.toFixed(2)} ms</p></div>`;
 
-        // Show final values for each node
-        html += '<div class="result-section"><h4>Final Node Voltages</h4>';
+        // Show final values for each node (filter V source terminals)
+        html += '<div class="result-section"><h4>Final Values</h4>';
         for (const [nodeId, values] of result.results) {
-            if (!nodeId.endsWith('_I')) {
-                const finalValue = values[values.length - 1];
-                const displayName = this.formatNodeName(nodeId);
-                html += `<div class="output-result">
-                    <span class="result-label">${displayName}</span>
-                    <span class="result-value">${finalValue.toFixed(4)} V</span>
-                </div>`;
-            }
+            // Skip voltage source positive/negative terminals
+            if (nodeId.includes('_positive') || nodeId.includes('_negative')) continue;
+
+            const finalValue = values[values.length - 1];
+            const displayName = this.formatNodeName(nodeId);
+            const unit = nodeId.endsWith('_I') ? ' mA' : ' V';
+            const displayValue = nodeId.endsWith('_I') ? finalValue * 1000 : finalValue;
+            html += `<div class="output-result">
+                <span class="result-label">${displayName}</span>
+                <span class="result-value">${displayValue.toFixed(4)}${unit}</span>
+            </div>`;
         }
         html += '</div>';
 
         // Show peak values
         html += '<div class="result-section"><h4>Peak Values</h4>';
         for (const [nodeId, values] of result.results) {
-            if (!nodeId.endsWith('_I')) {
-                const peak = Math.max(...values.map(Math.abs));
-                const displayName = this.formatNodeName(nodeId);
-                html += `<div class="output-result">
-                    <span class="result-label">${displayName}</span>
-                    <span class="result-value">${peak.toFixed(4)} V peak</span>
-                </div>`;
-            }
-        }
-        html += '</div>';
+            // Skip voltage source terminals
+            if (nodeId.includes('_positive') || nodeId.includes('_negative')) continue;
 
-        html += '<p style="opacity: 0.7; margin-top: 1rem;">Graph visualization coming soon!</p>';
-        html += '</div>';
+            const peak = Math.max(...values.map(Math.abs));
+            const displayName = this.formatNodeName(nodeId);
+            const unit = nodeId.endsWith('_I') ? ' mA peak' : ' V peak';
+            const displayValue = nodeId.endsWith('_I') ? peak * 1000 : peak;
+            html += `<div class="output-result">
+                <span class="result-label">${displayName}</span>
+                <span class="result-value">${displayValue.toFixed(4)}${unit}</span>
+            </div>`;
+        }
+        html += '</div></div>';
 
         this.showOutput(html, 'success');
+
+        // Show chart
+        this.showChart(result.timePoints, result.results);
     }
 
     /**
-     * Format node name for display
+     * Show chart with transient data
+     */
+    showChart(timePoints, series) {
+        if (!this.chartContainer || !this.chartOverlay) return;
+
+        // Show overlay first so container has size
+        this.chartOverlay.classList.add('visible');
+
+        // Use setTimeout to allow layout to update before creating/resizing chart
+        setTimeout(() => {
+            // Create chart if needed
+            if (!this.chart) {
+                this.chart = new SimpleChart(this.chartContainer, this.circuit);
+            } else {
+                // Force resize for existing chart
+                this.chart.resize();
+            }
+
+            // Set data
+            this.chart.setData(timePoints, series);
+        }, 50);
+    }
+
+    /**
+     * Hide chart
+     */
+    hideChart() {
+        if (this.chartOverlay) {
+            this.chartOverlay.classList.remove('visible');
+        }
+    }
+
+    /**
+     * Format node name for display - uses short labels matching chart
      */
     formatNodeName(nodeId) {
         // Extract readable name from node ID like "comp_11_positive"
         const match = nodeId.match(/^comp_(\d+)_(.+)$/);
         if (match) {
-            return `Node ${match[1]} (${match[2]})`;
+            const compId = `comp_${match[1]}`;
+            const terminal = match[2];
+
+            // Get component type
+            let typeChar = '?';
+            if (this.circuit && this.circuit.components) {
+                const comp = this.circuit.components.get(compId);
+                if (comp) {
+                    const name = comp.constructor.name;
+                    if (name === 'Resistor') typeChar = 'R';
+                    else if (name === 'Capacitor') typeChar = 'C';
+                    else if (name === 'Inductor') typeChar = 'L';
+                    else if (name === 'VoltageSource') typeChar = 'V';
+                    else typeChar = name[0];
+                }
+            }
+
+            // Current trace (e.g. comp_13_I)
+            if (terminal === 'I') {
+                return `I(${typeChar})`;
+            }
+            // Voltage labels
+            if (terminal === 'left' || terminal === 'right') {
+                return `V(${typeChar})`;
+            }
+            if (terminal === 'positive' || terminal === 'negative') {
+                return `V(${typeChar})`;
+            }
+            return terminal;
+        }
+        // Current traces
+        if (nodeId.endsWith('_I')) {
+            const compMatch = nodeId.match(/^comp_(\d+)_I$/);
+            if (compMatch) {
+                const compId = `comp_${compMatch[1]}`;
+                let typeChar = '?';
+                if (this.circuit && this.circuit.components) {
+                    const comp = this.circuit.components.get(compId);
+                    if (comp) {
+                        const name = comp.constructor.name;
+                        if (name === 'Resistor') typeChar = 'R';
+                        else if (name === 'Capacitor') typeChar = 'C';
+                        else if (name === 'Inductor') typeChar = 'L';
+                        else if (name === 'VoltageSource') typeChar = 'V';
+                        else typeChar = name[0];
+                    }
+                }
+                return `I(${typeChar})`;
+            }
+            return 'I';
         }
         return nodeId;
     }
@@ -282,10 +391,15 @@ export class SimulationControls {
      * Format component name for display
      */
     formatComponentName(compId) {
-        // Extract readable name from component ID like "comp_11"
+        // Try to get actual component name from circuit
+        const component = this.circuit.components?.get(compId);
+        if (component) {
+            return component.constructor.displayName || component.type;
+        }
+        // Fallback to simple ID
         const match = compId.match(/^comp_(\d+)$/);
         if (match) {
-            return `V${match[1]}`;
+            return `Source ${match[1]}`;
         }
         return compId;
     }

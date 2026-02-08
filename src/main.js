@@ -3,6 +3,10 @@
  * Initializes all modules and wires them together
  */
 
+// VERSION INDICATOR - if you see this, new code is loaded!
+console.log('%c[v2.0] Circuit Simulator - UPDATED CODE LOADED', 'background: green; color: white; font-size: 16px;');
+document.title = 'Circuit Simulator [v2.0]';
+
 import { CircuitGraph } from './core/CircuitGraph.js';
 import { Canvas } from './ui/Canvas.js';
 import { Toolbar } from './ui/Toolbar.js';
@@ -53,6 +57,9 @@ function init() {
     // Setup header buttons
     setupHeaderButtons();
 
+    // Setup collapsible panel sections
+    setupCollapsibleSections();
+
     // Update status bar
     updateStatus();
 
@@ -80,6 +87,21 @@ function setupHeaderButtons() {
     // Load circuit
     document.getElementById('btn-load')?.addEventListener('click', () => {
         loadCircuit();
+    });
+}
+
+/**
+ * Setup collapsible sections in the right panel
+ */
+function setupCollapsibleSections() {
+    const headers = document.querySelectorAll('.collapsible-header');
+
+    headers.forEach(header => {
+        header.addEventListener('click', () => {
+            const section = header.closest('.collapsible-section');
+            // Just toggle collapsed class - CSS handles the rest
+            section.classList.toggle('collapsed');
+        });
     });
 }
 

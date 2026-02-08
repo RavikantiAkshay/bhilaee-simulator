@@ -12,6 +12,7 @@ import { Capacitor } from './Capacitor.js';
 import { Inductor } from './Inductor.js';
 import { Ground } from './Ground.js';
 import { VoltageSource } from './VoltageSource.js';
+import { Junction } from './Junction.js';
 
 /**
  * List of all available components
@@ -20,6 +21,7 @@ import { VoltageSource } from './VoltageSource.js';
 export const COMPONENTS = [
     VoltageSource,
     Ground,
+    Junction,
     Resistor,
     Capacitor,
     Inductor
@@ -76,4 +78,4 @@ export function getComponentByShortcut(key) {
 }
 
 // Re-export component classes for convenience
-export { Resistor, Capacitor, Inductor, Ground, VoltageSource };
+export { Resistor, Capacitor, Inductor, Ground, VoltageSource, Junction };

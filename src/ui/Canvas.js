@@ -386,6 +386,52 @@ export class Canvas {
     }
 
     /**
+     * Start a wire from a junction point on an existing wire (for parallel circuits)
+     * Creates a virtual terminal at the click position
+     */
+    startWireFromJunction(existingWire, snappedPos) {
+        // Create a virtual junction terminal with required methods
+        const junctionTerminal = {
+            id: `junction_${Date.now()}`,
+            x: snappedPos.x,
+            y: snappedPos.y,
+            isJunction: true,
+            connectedWire: existingWire,
+            connectedWires: [],
+            // Required Terminal interface methods
+            getPosition: function () { return { x: this.x, y: this.y }; },
+            connect: function (wire) { this.connectedWires.push(wire); },
+            disconnect: function (wire) {
+                const idx = this.connectedWires.indexOf(wire);
+                if (idx >= 0) this.connectedWires.splice(idx, 1);
+            }
+        };
+
+        // Create new wire starting at junction
+        const newWire = new Wire(junctionTerminal, null);
+        newWire.isFromJunction = true;
+        newWire.junctionWire = existingWire;
+
+        // Start drag mode for the new wire
+        this.draggingWire = newWire;
+        this.mode = 'wire';
+        this.updateStatusMode();
+
+        // Create preview
+        this.wirePreview = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        this.wirePreview.classList.add('wire-preview');
+        this.wiresLayer.appendChild(this.wirePreview);
+
+        // Draw junction dot
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', snappedPos.x);
+        dot.setAttribute('cy', snappedPos.y);
+        dot.setAttribute('r', 5);
+        dot.setAttribute('fill', '#3fb950');
+        this.wirePreview.appendChild(dot);
+    }
+
+    /**
      * Start dragging a component
      */
     startDragging(component, mousePos) {
