@@ -8,6 +8,7 @@ import { Canvas } from './ui/Canvas.js';
 import { Toolbar } from './ui/Toolbar.js';
 import { PropertyPanel } from './ui/PropertyPanel.js';
 import { SimulationControls } from './ui/SimulationControls.js';
+import { testMatrixSolver, MNASolver } from './simulation/index.js';
 
 // Global instances
 let circuitGraph;
@@ -163,5 +164,12 @@ window.circuitSimulator = {
     get canvas() { return canvas; },
     get toolbar() { return toolbar; },
     get propertyPanel() { return propertyPanel; },
-    get simulationControls() { return simulationControls; }
+    get simulationControls() { return simulationControls; },
+    testMatrix: testMatrixSolver,
+    runDC: function () {
+        const solver = new MNASolver(circuitGraph);
+        const result = solver.solveDC();
+        console.log(solver.getResultsString());
+        return result;
+    }
 };

@@ -2,8 +2,9 @@
  * SimulationControls.js - Simulation control panel
  * 
  * Handles Run/Stop/Reset and analysis settings.
- * For now, just basic UI - simulation logic comes later.
  */
+
+import { MNASolver } from '../simulation/MNASolver.js';
 
 export class SimulationControls {
     /**
@@ -74,29 +75,83 @@ export class SimulationControls {
         // Get settings
         const settings = this.getSettings();
 
-        if (this.onRun) {
-            this.onRun(settings);
-        } else {
-            // Placeholder - actual simulation comes later
-            setTimeout(() => {
-                this.showOutput(`
-                    <div class="output-result">
-                        <div class="result-label">Analysis Type</div>
-                        <div class="result-value">${settings.analysisType.toUpperCase()}</div>
-                    </div>
-                    <div class="output-result">
-                        <div class="result-label">Components</div>
-                        <div class="result-value">${this.circuit.getComponentCount()}</div>
-                    </div>
-                    <div class="output-result">
-                        <div class="result-label">Status</div>
-                        <div class="result-value" style="color: var(--accent-secondary)">✓ Circuit valid - Solver pending</div>
-                    </div>
-                `, 'success');
-                this.running = false;
-                this.updateButtonStates();
-            }, 500);
+        // Run the appropriate analysis type
+        setTimeout(() => {
+            try {
+                if (settings.analysisType === 'dc') {
+                    this.runDCAnalysis();
+                } else if (settings.analysisType === 'ac') {
+                    this.runACAnalysis(settings);
+                } else if (settings.analysisType === 'transient') {
+                    this.showOutput('Transient analysis not yet implemented', 'info');
+                }
+            } catch (error) {
+                this.showErrors([error.message]);
+            }
+
+            this.running = false;
+            this.updateButtonStates();
+        }, 100);
+    }
+
+    /**
+     * Run DC analysis
+     */
+    runDCAnalysis() {
+        const solver = new MNASolver(this.circuit);
+        const result = solver.solveDC();
+
+        if (!result.success) {
+            this.showErrors([result.error]);
+            return;
         }
+
+        // Format results for display
+        const voltages = {};
+        for (const [nodeId, voltage] of result.nodeVoltages) {
+            // Clean up node ID for display
+            const displayName = this.formatNodeName(nodeId);
+            voltages[displayName] = voltage;
+        }
+
+        const currents = {};
+        for (const [compId, current] of result.branchCurrents) {
+            const displayName = this.formatComponentName(compId);
+            currents[displayName] = current;
+        }
+
+        this.displayResults({ voltages, currents });
+    }
+
+    /**
+     * Run AC analysis (placeholder for now)
+     */
+    runACAnalysis(settings) {
+        this.showOutput('AC analysis not yet implemented', 'info');
+    }
+
+    /**
+     * Format node name for display
+     */
+    formatNodeName(nodeId) {
+        // Extract readable name from node ID like "comp_11_positive"
+        const match = nodeId.match(/^comp_(\d+)_(.+)$/);
+        if (match) {
+            return `Node ${match[1]} (${match[2]})`;
+        }
+        return nodeId;
+    }
+
+    /**
+     * Format component name for display
+     */
+    formatComponentName(compId) {
+        // Extract readable name from component ID like "comp_11"
+        const match = compId.match(/^comp_(\d+)$/);
+        if (match) {
+            return `V${match[1]}`;
+        }
+        return compId;
     }
 
     /**

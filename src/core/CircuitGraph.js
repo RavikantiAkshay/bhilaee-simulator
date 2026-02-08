@@ -167,6 +167,14 @@ export class CircuitGraph {
     }
 
     /**
+     * Get all components as array
+     * @returns {Component[]}
+     */
+    getAllComponents() {
+        return Array.from(this.components.values());
+    }
+
+    /**
      * Clear the entire circuit
      */
     clear() {
