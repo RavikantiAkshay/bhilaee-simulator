@@ -291,10 +291,8 @@ export class SimpleChart {
                 const compId = `comp_${compMatch[1]}`;
                 // Try to get component type
                 let typeChar = '?';
-                console.log('formatNodeName:', nodeId, 'compId:', compId, 'hasCircuit:', !!this.circuit, 'hasComponents:', !!this.circuit?.components);
                 if (this.circuit && this.circuit.components) {
                     const comp = this.circuit.components.get(compId);
-                    console.log('  comp:', compId, 'found:', !!comp, 'type:', comp?.constructor?.name);
                     if (comp) {
                         const name = comp.constructor.name;
                         if (name === 'Resistor') typeChar = 'R';
