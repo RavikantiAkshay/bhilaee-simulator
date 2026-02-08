@@ -1,9 +1,9 @@
 /**
- * MNASolver.js - Modified Nodal Analysis for DC Circuit Simulation
+ * MNASolver.js - Modified Nodal Analysis for DC/AC Circuit Simulation
  * 
  * MNA builds a system of equations: G*V = I
  * Where:
- * - G is the conductance matrix
+ * - G is the conductance/admittance matrix
  * - V is the vector of node voltages
  * - I is the vector of current sources
  * 
@@ -11,6 +11,7 @@
  */
 
 import { Matrix, solveLinearSystem } from './Matrix.js';
+import { Complex, ComplexMatrix, solveComplexSystem } from './Complex.js';
 
 export class MNASolver {
     constructor(circuitGraph) {
@@ -84,6 +85,182 @@ export class MNASolver {
         }
     }
 
+    /**
+     * Run AC analysis at a given frequency
+     * @param {number} frequency - Frequency in Hz
+     * @returns {{ nodeVoltages: Map, branchCurrents: Map, success: boolean, error: string }}
+     */
+    solveAC(frequency = 1000) {
+        try {
+            // Build node list
+            this.buildNodeList();
+
+            if (this.nodes.length === 0) {
+                return { success: false, error: 'No nodes found.' };
+            }
+
+            if (!this.hasGround()) {
+                return { success: false, error: 'Circuit must have a ground reference.' };
+            }
+
+            // Build complex MNA system
+            const omega = 2 * Math.PI * frequency;
+            const { Y, I } = this.buildACSystem(omega);
+
+            // Debug output
+            console.log(`=== MNA AC Analysis @ ${frequency} Hz ===`);
+            console.log('Nodes:', this.nodes);
+            Y.print('Y matrix:');
+            console.log('I vector:', I.map(c => c.toString()));
+
+            // Solve complex system
+            const solution = solveComplexSystem(Y, I);
+            console.log('Solution:', solution.map(c => c.toPolar()));
+
+            // Extract results
+            const nodeVoltages = new Map();
+            for (let i = 0; i < this.nodes.length; i++) {
+                nodeVoltages.set(this.nodes[i], solution[i]);
+            }
+
+            const branchCurrents = new Map();
+            for (let i = 0; i < this.voltageSources.length; i++) {
+                const vs = this.voltageSources[i];
+                branchCurrents.set(vs.id, solution[this.nodes.length + i]);
+            }
+
+            this.result = { nodeVoltages, branchCurrents, success: true, frequency };
+            return this.result;
+
+        } catch (error) {
+            console.error('MNA AC Solver error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Build complex admittance matrix for AC analysis
+     */
+    buildACSystem(omega) {
+        const n = this.nodes.length;
+        const m = this.voltageSources.length;
+        const size = n + m;
+
+        const Y = new ComplexMatrix(size, size);
+        const I = new Array(size).fill(null).map(() => Complex.zero());
+
+        const components = this.circuit.getAllComponents();
+
+        for (const component of components) {
+            this.stampACComponent(component, Y, I, omega);
+        }
+
+        return { Y, I };
+    }
+
+    /**
+     * Stamp component for AC analysis
+     */
+    stampACComponent(component, Y, I, omega) {
+        const type = component.constructor.name;
+
+        switch (type) {
+            case 'Resistor':
+                this.stampACResistor(component, Y);
+                break;
+            case 'Capacitor':
+                this.stampACCapacitor(component, Y, omega);
+                break;
+            case 'Inductor':
+                this.stampACInductor(component, Y, omega);
+                break;
+            case 'VoltageSource':
+                this.stampACVoltageSource(component, Y, I);
+                break;
+            case 'Ground':
+                break;
+        }
+    }
+
+    /**
+     * Stamp resistor for AC (same as DC, but complex)
+     */
+    stampACResistor(component, Y) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+        const g = Complex.fromReal(1 / component.properties.resistance);
+
+        if (n1 !== null) Y.add(n1, n1, g);
+        if (n2 !== null) Y.add(n2, n2, g);
+        if (n1 !== null && n2 !== null) {
+            Y.add(n1, n2, g.neg());
+            Y.add(n2, n1, g.neg());
+        }
+    }
+
+    /**
+     * Stamp capacitor: Y = jωC
+     */
+    stampACCapacitor(component, Y, omega) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+        const C = component.properties.capacitance;
+        const y = new Complex(0, omega * C); // jωC
+
+        if (n1 !== null) Y.add(n1, n1, y);
+        if (n2 !== null) Y.add(n2, n2, y);
+        if (n1 !== null && n2 !== null) {
+            Y.add(n1, n2, y.neg());
+            Y.add(n2, n1, y.neg());
+        }
+    }
+
+    /**
+     * Stamp inductor: Y = 1/(jωL) = -j/(ωL)
+     */
+    stampACInductor(component, Y, omega) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+        const L = component.properties.inductance;
+        const y = new Complex(0, -1 / (omega * L)); // 1/(jωL) = -j/(ωL)
+
+        if (n1 !== null) Y.add(n1, n1, y);
+        if (n2 !== null) Y.add(n2, n2, y);
+        if (n1 !== null && n2 !== null) {
+            Y.add(n1, n2, y.neg());
+            Y.add(n2, n1, y.neg());
+        }
+    }
+
+    /**
+     * Stamp voltage source for AC
+     */
+    stampACVoltageSource(component, Y, I) {
+        const [tPos, tNeg] = component.terminals;
+        const n1 = this.getNodeIndex(tPos);
+        const n2 = this.getNodeIndex(tNeg);
+        const vsIndex = this.nodes.length + this.voltageSources.indexOf(component);
+
+        const V = component.properties.voltage;
+        const phase = (component.properties.phase || 0) * Math.PI / 180;
+        const Vphasor = Complex.fromPolar(V, phase);
+
+        const one = Complex.one();
+
+        if (n1 !== null) {
+            Y.add(n1, vsIndex, one);
+            Y.add(vsIndex, n1, one);
+        }
+        if (n2 !== null) {
+            Y.add(n2, vsIndex, one.neg());
+            Y.add(vsIndex, n2, one.neg());
+        }
+
+        I[vsIndex] = Vphasor;
+    }
     /**
      * Build list of unique nodes from circuit
      */

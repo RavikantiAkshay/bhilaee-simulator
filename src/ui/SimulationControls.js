@@ -124,10 +124,79 @@ export class SimulationControls {
     }
 
     /**
-     * Run AC analysis (placeholder for now)
+     * Run AC analysis
      */
     runACAnalysis(settings) {
-        this.showOutput('AC analysis not yet implemented', 'info');
+        const solver = new MNASolver(this.circuit);
+
+        // Use default frequency of 1kHz if not specified
+        const frequency = settings.frequency || 1000;
+        const result = solver.solveAC(frequency);
+
+        if (!result.success) {
+            this.showErrors([result.error]);
+            return;
+        }
+
+        // Format results for display (complex values with magnitude and phase)
+        const voltages = {};
+        for (const [nodeId, voltage] of result.nodeVoltages) {
+            const displayName = this.formatNodeName(nodeId);
+            voltages[displayName] = {
+                magnitude: voltage.magnitude(),
+                phase: voltage.phaseDegrees(),
+                complex: voltage
+            };
+        }
+
+        const currents = {};
+        for (const [compId, current] of result.branchCurrents) {
+            const displayName = this.formatComponentName(compId);
+            currents[displayName] = {
+                magnitude: current.magnitude(),
+                phase: current.phaseDegrees(),
+                complex: current
+            };
+        }
+
+        this.displayACResults({ voltages, currents, frequency });
+    }
+
+    /**
+     * Display AC analysis results with magnitude and phase
+     */
+    displayACResults(results) {
+        if (!results || !this.outputContent) return;
+
+        let html = `<div class="simulation-results">`;
+        html += `<div class="result-section"><h4>AC Analysis @ ${results.frequency} Hz</h4></div>`;
+
+        // Node voltages
+        if (Object.keys(results.voltages).length > 0) {
+            html += '<div class="result-section"><h4>Node Voltages (Phasor)</h4>';
+            for (const [node, v] of Object.entries(results.voltages)) {
+                html += `<div class="output-result">
+                    <span class="result-label">${node}</span>
+                    <span class="result-value">${v.magnitude.toFixed(4)} V ∠ ${v.phase.toFixed(1)}°</span>
+                </div>`;
+            }
+            html += '</div>';
+        }
+
+        // Currents
+        if (Object.keys(results.currents).length > 0) {
+            html += '<div class="result-section"><h4>Currents (Phasor)</h4>';
+            for (const [comp, i] of Object.entries(results.currents)) {
+                html += `<div class="output-result">
+                    <span class="result-label">${comp}</span>
+                    <span class="result-value">${(i.magnitude * 1000).toFixed(4)} mA ∠ ${i.phase.toFixed(1)}°</span>
+                </div>`;
+            }
+            html += '</div>';
+        }
+
+        html += '</div>';
+        this.showOutput(html, 'success');
     }
 
     /**
