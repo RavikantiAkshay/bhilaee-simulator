@@ -5,6 +5,7 @@
  */
 
 import { MNASolver } from '../simulation/MNASolver.js';
+import { TransientSolver } from '../simulation/TransientSolver.js';
 
 export class SimulationControls {
     /**
@@ -83,7 +84,7 @@ export class SimulationControls {
                 } else if (settings.analysisType === 'ac') {
                     this.runACAnalysis(settings);
                 } else if (settings.analysisType === 'transient') {
-                    this.showOutput('Transient analysis not yet implemented', 'info');
+                    this.runTransientAnalysis(settings);
                 }
             } catch (error) {
                 this.showErrors([error.message]);
@@ -196,6 +197,72 @@ export class SimulationControls {
         }
 
         html += '</div>';
+        this.showOutput(html, 'success');
+    }
+
+    /**
+     * Run transient analysis
+     */
+    runTransientAnalysis(settings) {
+        const solver = new TransientSolver(this.circuit);
+
+        const endTime = settings.simulationTime || 0.01;
+        const timeStep = settings.timeStep || 0.0001;
+
+        const result = solver.solve(endTime, timeStep);
+
+        if (!result.success) {
+            this.showErrors([result.error]);
+            return;
+        }
+
+        this.displayTransientResults(result);
+    }
+
+    /**
+     * Display transient analysis results (text summary)
+     */
+    displayTransientResults(result) {
+        if (!result || !this.outputContent) return;
+
+        const numPoints = result.timePoints.length;
+        const endTime = result.timePoints[numPoints - 1] * 1000; // ms
+
+        let html = `<div class="simulation-results">`;
+        html += `<div class="result-section"><h4>Transient Analysis</h4>`;
+        html += `<p>Simulated ${numPoints} points from 0 to ${endTime.toFixed(2)} ms</p></div>`;
+
+        // Show final values for each node
+        html += '<div class="result-section"><h4>Final Node Voltages</h4>';
+        for (const [nodeId, values] of result.results) {
+            if (!nodeId.endsWith('_I')) {
+                const finalValue = values[values.length - 1];
+                const displayName = this.formatNodeName(nodeId);
+                html += `<div class="output-result">
+                    <span class="result-label">${displayName}</span>
+                    <span class="result-value">${finalValue.toFixed(4)} V</span>
+                </div>`;
+            }
+        }
+        html += '</div>';
+
+        // Show peak values
+        html += '<div class="result-section"><h4>Peak Values</h4>';
+        for (const [nodeId, values] of result.results) {
+            if (!nodeId.endsWith('_I')) {
+                const peak = Math.max(...values.map(Math.abs));
+                const displayName = this.formatNodeName(nodeId);
+                html += `<div class="output-result">
+                    <span class="result-label">${displayName}</span>
+                    <span class="result-value">${peak.toFixed(4)} V peak</span>
+                </div>`;
+            }
+        }
+        html += '</div>';
+
+        html += '<p style="opacity: 0.7; margin-top: 1rem;">Graph visualization coming soon!</p>';
+        html += '</div>';
+
         this.showOutput(html, 'success');
     }
 
