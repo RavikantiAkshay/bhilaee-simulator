@@ -24,6 +24,11 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 - Collapsible sections for better output visibility
 - Interactive waveform chart with legend
 
+### State Management
+- **Persistent Storage** - Circuits are saved automatically to the browser's local storage
+- **Experiment Isolation** - Use `?expId=your_experiment_name` in the URL to create separate workspaces
+- **Auto-Save** - Changes are saved instantly; no manual saving required
+
 ## Getting Started
 
 1. Serve the project files with a local server:
@@ -43,7 +48,11 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
    - Select analysis type (DC, AC, or Transient)
    - Configure simulation parameters
    - Click "Run" to execute simulation
+   - Click "Run" to execute simulation
    - View results in the Output panel and waveform chart
+
+5. Reset State:
+   - To clear the current experiment, run `window.circuitSimulator.stateManager.resetState()` in the browser console.
 
 ## Keyboard Shortcuts
 
@@ -57,6 +66,8 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 | J | Place Junction |
 | Delete | Delete selected component |
 | Escape | Cancel current action |
+
+**Note:** Shortcuts are disabled when holding `Ctrl`, `Alt`, or `Meta` keys (e.g., `Ctrl+R` will reload the page instead of adding a Resistor).
 
 ## Project Structure
 
