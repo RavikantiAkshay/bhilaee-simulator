@@ -175,6 +175,7 @@ export class MNASolver {
                 this.stampACInductor(component, Y, omega);
                 break;
             case 'VoltageSource':
+            case 'Ammeter':
                 this.stampACVoltageSource(component, Y, I);
                 break;
             case 'Ground':
@@ -244,8 +245,14 @@ export class MNASolver {
         const n2 = this.getNodeIndex(tNeg);
         const vsIndex = this.nodes.length + this.voltageSources.indexOf(component);
 
-        const V = component.properties.voltage;
-        const phase = (component.properties.phase || 0) * Math.PI / 180;
+        let V = 0;
+        let phase = 0;
+
+        if (component.constructor.name !== 'Ammeter') {
+            V = component.properties.voltage;
+            phase = (component.properties.phase || 0) * Math.PI / 180;
+        }
+
         const Vphasor = Complex.fromPolar(V, phase);
 
         const one = Complex.one();
@@ -274,8 +281,8 @@ export class MNASolver {
 
         // Collect all terminals
         for (const component of components) {
-            // Track voltage sources
-            if (component.constructor.name === 'VoltageSource') {
+            // Track voltage sources and ammeters
+            if (component.constructor.name === 'VoltageSource' || component.constructor.name === 'Ammeter') {
                 this.voltageSources.push(component);
             }
 
@@ -383,6 +390,7 @@ export class MNASolver {
                 this.stampResistor(component, G);
                 break;
             case 'VoltageSource':
+            case 'Ammeter':
                 this.stampVoltageSource(component, G, I);
                 break;
             case 'Capacitor':
@@ -444,7 +452,9 @@ export class MNASolver {
         const n1 = this.getNodeIndex(tPos); // positive terminal
         const n2 = this.getNodeIndex(tNeg); // negative terminal
         const vsIndex = this.nodes.length + this.voltageSources.indexOf(component);
-        const V = component.properties.voltage;
+
+        // Ammeter has 0V drop
+        const V = (component.constructor.name === 'Ammeter') ? 0 : component.properties.voltage;
 
         // Voltage source equations
         if (n1 !== null) {

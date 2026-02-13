@@ -11,6 +11,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 - **Inductor** - Inductance with configurable value
 - **Ground** - Reference node (0V)
 - **Junction** - Connection point for parallel circuits
+- **Ammeter** - Current measurement (0V source)
 
 ### Analysis Types
 - **DC Analysis** - Steady-state DC operating point
@@ -25,9 +26,9 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 - Interactive waveform chart with legend
 
 ### State Management
-- **Persistent Storage** - Circuits are saved automatically to the browser's local storage
-- **Experiment Isolation** - Use `?expId=your_experiment_name` in the URL to create separate workspaces
-- **Auto-Save** - Changes are saved instantly; no manual saving required
+- **Persistent Storage** - Circuits are saved to browser local storage (manual save only)
+- **Templates** - Experiments load from immutable template files by default (`?expId=name`)
+- **Manual Save** - Click "Save" to persist changes; Reload to reset to template (if unsaved)
 
 ## Getting Started
 
@@ -63,6 +64,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 | V | Place Voltage Source |
 | G | Place Ground |
 | J | Place Junction |
+| A | Place Ammeter |
 | Delete | Delete selected component |
 | Escape | Cancel current action |
 

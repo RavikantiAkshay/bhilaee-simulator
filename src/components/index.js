@@ -13,6 +13,7 @@ import { Inductor } from './Inductor.js';
 import { Ground } from './Ground.js';
 import { VoltageSource } from './VoltageSource.js';
 import { Junction } from './Junction.js';
+import { Ammeter } from './Ammeter.js';
 
 /**
  * List of all available components
@@ -24,7 +25,8 @@ export const COMPONENTS = [
     Junction,
     Resistor,
     Capacitor,
-    Inductor
+    Inductor,
+    Ammeter
 ];
 
 /**

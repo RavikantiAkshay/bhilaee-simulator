@@ -5,6 +5,8 @@
  * Ensures state isolation between different experiments.
  */
 
+import { circuitTemplates } from '../templates/index.js';
+
 export class StateManager {
     /**
      * @param {string} expId - Experiment identifier (e.g., 'superposition')
@@ -29,14 +31,53 @@ export class StateManager {
     loadState() {
         try {
             const raw = localStorage.getItem(this.storageKey);
-            if (!raw) return null;
+            if (raw) {
+                const state = JSON.parse(raw);
+                console.log(`StateManager: Loaded persistent state for ${this.expId}`);
+                return state;
+            }
 
-            const state = JSON.parse(raw);
-            console.log(`StateManager: Loaded state for ${this.expId}`, state);
-            return state;
+            // Fallback: Check for template
+            const template = circuitTemplates[this.expId];
+            if (template) {
+                console.log(`StateManager: Initializing from template for ${this.expId}`);
+                // Deep clone template to avoid mutation
+                const initialState = {
+                    expId: this.expId,
+                    timestamp: Date.now(),
+                    // Template structure might differ from serialized circuit, 
+                    // dependent on how user provides "connections".
+                    // For now, we assume template follows a structure we can parse or use.
+                    // Actually, the user's template has 'components' and 'connections'.
+                    // Our serialize() returns { components: [...], wires: [...] }.
+                    // We might need a flexible adapter here, but user said "Structure of sim_states: { ...stateObject... }"
+                    // which implies the template *is* the state object or close to it.
+                    // Let's wrap it in the expected state structure.
+                    circuit: JSON.parse(JSON.stringify(template))
+                };
+
+                // Return immediately without saving to localStorage
+                // This ensures reloads fetch the immutable template unless user saves manually
+                return initialState;
+            }
+
+            return null;
         } catch (e) {
             console.error('StateManager: Failed to load state', e);
             return null;
+        }
+    }
+
+    /**
+     * Helper to save state object directly (internal use)
+     */
+    saveIntervalState(state) {
+        try {
+            const json = JSON.stringify(state);
+            localStorage.setItem(this.storageKey, json);
+            this.lastSavedState = json;
+        } catch (e) {
+            console.error('StateManager: Failed to save initial template state', e);
         }
     }
 

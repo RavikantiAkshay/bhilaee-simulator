@@ -136,7 +136,14 @@ export class SimulationControls {
         const currents = {};
         for (const [compId, current] of result.branchCurrents) {
             const displayName = this.formatComponentName(compId);
-            currents[displayName] = Math.abs(current); // Use absolute value
+            const absCurrent = Math.abs(current);
+            currents[displayName] = absCurrent;
+
+            // Update Ammeter component if applicable
+            const comp = this.circuit.components.get(compId);
+            if (comp && comp.constructor.name === 'Ammeter') {
+                comp.setCurrent(absCurrent);
+            }
         }
 
         this.displayResults({ voltages, currents });
@@ -174,11 +181,18 @@ export class SimulationControls {
         const currents = {};
         for (const [compId, current] of result.branchCurrents) {
             const displayName = this.formatComponentName(compId);
+            const magnitude = current.magnitude();
             currents[displayName] = {
-                magnitude: current.magnitude(),
+                magnitude: magnitude,
                 phase: current.phaseDegrees(),
                 complex: current
             };
+
+            // Update Ammeter component if applicable (show magnitude)
+            const comp = this.circuit.components.get(compId);
+            if (comp && comp.constructor.name === 'Ammeter') {
+                comp.setCurrent(magnitude);
+            }
         }
 
         this.displayACResults({ voltages, currents, frequency });

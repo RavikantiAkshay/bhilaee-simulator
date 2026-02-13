@@ -87,7 +87,8 @@ function init() {
     // Listen for circuit changes (topology)
     circuitGraph.onChange = (type, data) => {
         // console.log('Circuit changed:', type);
-        stateManager.autosave(circuitGraph);
+        // Auto-save disabled per user request
+        // stateManager.autosave(circuitGraph);
         updateStatus(); // Ensure UI status updates
     };
 
@@ -95,7 +96,8 @@ function init() {
     if (propertyPanel) {
         propertyPanel.onPropertyChange = (component, prop, value) => {
             // console.log('Property changed:', prop, value);
-            stateManager.autosave(circuitGraph);
+            // Auto-save disabled per user request
+            // stateManager.autosave(circuitGraph);
         };
     }
 
