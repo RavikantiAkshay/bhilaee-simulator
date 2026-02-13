@@ -48,7 +48,6 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
    - Select analysis type (DC, AC, or Transient)
    - Configure simulation parameters
    - Click "Run" to execute simulation
-   - Click "Run" to execute simulation
    - View results in the Output panel and waveform chart
 
 5. Reset State:
@@ -66,8 +65,6 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 | J | Place Junction |
 | Delete | Delete selected component |
 | Escape | Cancel current action |
-
-**Note:** Shortcuts are disabled when holding `Ctrl`, `Alt`, or `Meta` keys (e.g., `Ctrl+R` will reload the page instead of adding a Resistor).
 
 ## Project Structure
 
