@@ -276,8 +276,9 @@ export class Wire {
 }
 
 /**
- * Reset wire ID counter
+ * Set wire ID counter
+ * @param {number} count 
  */
-export function resetWireCounter() {
-    wireIdCounter = 0;
+export function setWireIdCounter(count) {
+    wireIdCounter = count;
 }

@@ -15,6 +15,9 @@ export class PropertyPanel {
         this.canvas = canvas;
         this.currentComponent = null;
 
+        // Callback for property changes
+        this.onPropertyChange = null;
+
         // Listen for selection changes
         if (canvas) {
             canvas.onSelectionChange = (type, item) => {
@@ -181,6 +184,11 @@ export class PropertyPanel {
             }
 
             component.setProperty(definition.name, value);
+
+            // Notify change
+            if (this.onPropertyChange) {
+                this.onPropertyChange(component, definition.name, value);
+            }
 
             // Refresh panel if changing a property that affects conditions (like 'type')
             if (definition.name === 'type') {

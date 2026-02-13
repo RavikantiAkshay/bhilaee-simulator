@@ -6,6 +6,9 @@
  */
 
 import { Node, resetNodeCounter } from './Node.js';
+import { createComponent } from '../components/index.js';
+import { Wire, setWireIdCounter } from './Wire.js';
+import { setComponentIdCounter } from './Component.js';
 
 export class CircuitGraph {
     constructor() {
@@ -324,6 +327,34 @@ export class CircuitGraph {
     }
 
     /**
+     * Clear the entire circuit
+     */
+    clear() {
+        // Remove all SVG elements
+        for (const component of this.components.values()) {
+            if (component.element && component.element.parentNode) {
+                component.element.parentNode.removeChild(component.element);
+            }
+        }
+        for (const wire of this.wires.values()) {
+            if (wire.element && wire.element.parentNode) {
+                wire.element.parentNode.removeChild(wire.element);
+            }
+        }
+
+        // Clear maps
+        this.components.clear();
+        this.wires.clear();
+        this.nodes.clear();
+        this.groundNode = null;
+
+        // Reset counters (optional, but good for cleanliness if not preserving IDs)
+        // But deserialize sets them specifically, so this is safe.
+
+        this.notifyChange('circuit-cleared', null);
+    }
+
+    /**
      * Generate netlist for simulation
      * @returns {Array<{type: string, nodes: string[], properties: Object}>}
      */
@@ -380,5 +411,101 @@ export class CircuitGraph {
             wires: this.wires.size,
             nodes: this.nodes.size
         };
+    }
+
+    /**
+     * Find terminal by ID
+     * @param {string} id 
+     * @returns {Terminal|null}
+     */
+    findTerminalById(id) {
+        if (!id) return null;
+        for (const component of this.components.values()) {
+            for (const terminal of component.terminals) {
+                if (terminal.id === id) return terminal;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Deserialize circuit from JSON
+     * @param {Object} data 
+     */
+    deserialize(data) {
+        this.clear(); // Ensure clean slate
+
+        if (!data || !data.components) return;
+
+        // Reset counters to 0 before restoring to ensure we find the true max
+        // Actually, we should just let the max finding logic handle it.
+
+        // Restore components
+        let maxCompId = 0;
+        for (const compData of data.components) {
+            const component = createComponent(compData.type, compData.x, compData.y);
+            if (component) {
+                // Restore ID and properties
+                component.id = compData.id;
+
+                // Track max ID to prevent collisions
+                const idNum = parseInt(component.id.replace('comp_', ''));
+                if (!isNaN(idNum) && idNum > maxCompId) maxCompId = idNum;
+
+                component.rotation = compData.rotation;
+                component.properties = { ...compData.properties };
+
+                // Fix terminal IDs to match restored component ID
+                for (const terminal of component.terminals) {
+                    terminal.id = `${component.id}_${terminal.name}`;
+                    terminal.component = component;
+                }
+
+                // Force update of SVG transforms/labels
+                component.updateElement();
+
+                this.addComponent(component);
+            }
+        }
+
+        // Sync component ID counter
+        setComponentIdCounter(maxCompId);
+
+        // Restore wires
+        let maxWireId = 0;
+        if (data.wires) {
+            for (const wireData of data.wires) {
+                const startTerm = this.findTerminalById(wireData.startTerminal);
+                const endTerm = this.findTerminalById(wireData.endTerminal);
+
+                if (startTerm && endTerm) {
+                    // Create wire (this increments counter, but we'll reset it after)
+                    const wire = new Wire(startTerm, endTerm);
+                    wire.id = wireData.id;
+
+                    // Track max ID
+                    const idNum = parseInt(wire.id.replace('wire_', ''));
+                    if (!isNaN(idNum) && idNum > maxWireId) maxWireId = idNum;
+
+                    // Restore custom routing points
+                    if (wireData.points && wireData.points.length > 0) {
+                        wire.points = wireData.points;
+                        if (wireData.points.length >= 2) {
+                            const bendX = wireData.points[1].x;
+                            wire.bendOffset = bendX;
+                        }
+                    }
+
+                    this.addWire(wire);
+                } else {
+                    console.warn(`Skipping wire ${wireData.id}: Terminal not found (start=${wireData.startTerminal}, end=${wireData.endTerminal})`);
+                }
+            }
+        }
+
+        // Sync wire ID counter
+        setWireIdCounter(maxWireId);
+
+        this.notifyChange('circuit-loaded', null);
     }
 }

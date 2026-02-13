@@ -8,6 +8,7 @@ import { Canvas } from './ui/Canvas.js';
 import { Toolbar } from './ui/Toolbar.js';
 import { PropertyPanel } from './ui/PropertyPanel.js';
 import { SimulationControls } from './ui/SimulationControls.js';
+import { StateManager } from './utils/StateManager.js';
 import { testMatrixSolver, MNASolver } from './simulation/index.js';
 
 // Global instances
@@ -54,7 +55,52 @@ function init() {
     setupHeaderButtons();
 
     // Setup collapsible panel sections
+    // Setup collapsible panel sections
     setupCollapsibleSections();
+
+    // ----------------------------------------------------
+    // State Persistence
+    // ----------------------------------------------------
+
+    // Get experiment ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const expId = urlParams.get('expId') || 'sandbox'; // Default if not provided
+    console.log(`🔌 Initializing session for experiment: ${expId}`);
+
+    const stateManager = new StateManager(expId);
+
+    // Load previous state if available
+    const savedState = stateManager.loadState();
+    if (savedState && savedState.circuit) {
+        console.log('Restoring saved simulation state...');
+        circuitGraph.deserialize(savedState.circuit);
+
+        // Force UI update
+        if (canvas) {
+            canvas.renderAll();
+        }
+    } else {
+        // Initial save for new session
+        stateManager.saveState(circuitGraph);
+    }
+
+    // Listen for circuit changes (topology)
+    circuitGraph.onChange = (type, data) => {
+        // console.log('Circuit changed:', type);
+        stateManager.autosave(circuitGraph);
+        updateStatus(); // Ensure UI status updates
+    };
+
+    // Listen for property changes (values)
+    if (propertyPanel) {
+        propertyPanel.onPropertyChange = (component, prop, value) => {
+            // console.log('Property changed:', prop, value);
+            stateManager.autosave(circuitGraph);
+        };
+    }
+
+    // Expose for debugging/external control
+    window.circuitSimulator.stateManager = stateManager;
 
     // Update status bar
     updateStatus();
@@ -104,24 +150,23 @@ function setupCollapsibleSections() {
 /**
  * Save circuit to local storage (or file)
  */
+/**
+ * Save circuit to local storage via StateManager
+ */
 function saveCircuit() {
     try {
-        const data = circuitGraph.serialize();
-        const json = JSON.stringify(data, null, 2);
+        // Force immediate save
+        window.circuitSimulator.stateManager.saveState(circuitGraph);
 
-        // For now, save to localStorage
-        localStorage.setItem('circuit-simulator-save', json);
+        // Visual feedback
+        const originalText = document.getElementById('btn-save').innerHTML;
+        const btn = document.getElementById('btn-save');
+        btn.textContent = '✓ Saved';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+        }, 1000);
 
-        // Also offer download
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'circuit.json';
-        a.click();
-        URL.revokeObjectURL(url);
-
-        console.log('Circuit saved!');
+        console.log('Circuit saved manually!');
     } catch (error) {
         console.error('Failed to save circuit:', error);
         alert('Failed to save circuit');
@@ -167,10 +212,10 @@ function updateStatus() {
     const statusZoom = document.getElementById('status-zoom');
     const statusComponents = document.getElementById('status-components');
 
-    if (statusMode) statusMode.textContent = 'Mode: Edit';
-    if (statusCoords) statusCoords.textContent = 'X: 0, Y: 0';
-    if (statusZoom) statusZoom.textContent = 'Zoom: 100%';
-    if (statusComponents) statusComponents.textContent = 'Components: 0';
+    if (statusMode) statusMode.textContent = `Mode: ${canvas ? canvas.mode : 'Edit'}`;
+    if (statusCoords) statusCoords.textContent = 'X: 0, Y: 0'; // Dynamic
+    if (statusZoom) statusZoom.textContent = `Zoom: ${canvas ? Math.round(canvas.zoom * 100) : 100}%`;
+    if (statusComponents) statusComponents.textContent = `Components: ${circuitGraph ? circuitGraph.getComponentCount() : 0}`;
 }
 
 // Initialize when DOM is ready

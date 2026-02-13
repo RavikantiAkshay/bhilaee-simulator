@@ -78,8 +78,11 @@ export class Toolbar {
      */
     setupEventListeners() {
         document.addEventListener('keydown', (event) => {
-            // Don't handle if typing in input
-            if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') {
+            // Don't handle if typing in input or if modifiers are pressed
+            if (event.target.tagName === 'INPUT' ||
+                event.target.tagName === 'SELECT' ||
+                event.target.tagName === 'TEXTAREA' ||
+                event.ctrlKey || event.metaKey || event.altKey) {
                 return;
             }
 

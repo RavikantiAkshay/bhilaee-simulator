@@ -11,6 +11,10 @@ function generateId() {
     return `comp_${++componentIdCounter}`;
 }
 
+export function setComponentIdCounter(count) {
+    componentIdCounter = count;
+}
+
 /**
  * Terminal class - represents a connection point on a component
  */
@@ -406,7 +410,8 @@ export class Component {
             x: this.x,
             y: this.y,
             rotation: this.rotation,
-            properties: { ...this.properties }
+            properties: { ...this.properties },
+            state: { ...this.state } // Save transient state
         };
     }
 
@@ -420,6 +425,9 @@ export class Component {
         this.y = data.y;
         this.rotation = data.rotation;
         this.properties = { ...data.properties };
+        if (data.state) {
+            this.state = { ...data.state };
+        }
     }
 }
 

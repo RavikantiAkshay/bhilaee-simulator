@@ -521,6 +521,30 @@ export class Canvas {
     }
 
     /**
+     * Render all elements from circuit graph
+     * (Used after loading state)
+     */
+    renderAll() {
+        // Clear SVG layers (visuals only)
+        this.componentsLayer.innerHTML = '';
+        this.wiresLayer.innerHTML = '';
+        this.interactionLayer.innerHTML = '';
+
+        // Render components
+        for (const component of this.circuit.components.values()) {
+            this.renderComponent(component);
+        }
+
+        // Render wires
+        for (const wire of this.circuit.wires.values()) {
+            const path = wire.render();
+            this.wiresLayer.appendChild(path);
+        }
+
+        this.updateComponentCount();
+    }
+
+    /**
      * Clear canvas
      */
     clear() {
