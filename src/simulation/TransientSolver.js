@@ -88,6 +88,16 @@ export class TransientSolver {
                 // Build and solve system for this time step
                 const solution = this.solveTimeStep();
 
+                // Divergence detection
+                for (let i = 0; i < solution.length; i++) {
+                    if (!isFinite(solution[i]) || Math.abs(solution[i]) > 1e15) {
+                        return {
+                            success: false,
+                            error: `Simulation diverged at t=${(this.time * 1000).toFixed(4)}ms (node value: ${solution[i].toExponential(2)}). Check circuit connectivity and component values.`
+                        };
+                    }
+                }
+
                 // Store results
                 this.timePoints.push(this.time);
                 for (let i = 0; i < this.nodes.length; i++) {
@@ -154,7 +164,7 @@ export class TransientSolver {
         const components = this.circuit.getAllComponents();
 
         for (const component of components) {
-            if (component.constructor.name === 'VoltageSource') {
+            if (component.constructor.name === 'VoltageSource' || component.constructor.name === 'Ammeter') {
                 this.voltageSources.push(component);
             }
 
@@ -278,7 +288,14 @@ export class TransientSolver {
             case 'VoltageSource':
                 this.stampVoltageSource(component, G, I);
                 break;
+            case 'Ammeter':
+                this.stampAmmeter(component, G, I);
+                break;
+            case 'Voltmeter':
+                this.stampVoltmeter(component, G);
+                break;
             case 'Ground':
+            case 'Junction':
                 break;
         }
     }
@@ -348,9 +365,10 @@ export class TransientSolver {
             G.add(n2, n1, -g);
         }
 
-        // Current source representing stored current
-        if (n1 !== null) I[n1] += iPrev;
-        if (n2 !== null) I[n2] -= iPrev;
+        // Current source: iPrev flows from n1 to n2 (leaves n1, enters n2)
+        // MNA convention: I[n] = current entering node n
+        if (n1 !== null) I[n1] -= iPrev;
+        if (n2 !== null) I[n2] += iPrev;
     }
 
     /**
@@ -380,6 +398,44 @@ export class TransientSolver {
         }
 
         I[vsIndex] = V;
+    }
+
+    /**
+     * Stamp Ammeter as 0V voltage source (same as VoltageSource with V=0)
+     */
+    stampAmmeter(component, G, I) {
+        const [tPos, tNeg] = component.terminals;
+        const n1 = this.getNodeIndex(tPos);
+        const n2 = this.getNodeIndex(tNeg);
+        const vsIndex = this.nodes.length + this.voltageSources.indexOf(component);
+
+        if (n1 !== null) {
+            G.add(n1, vsIndex, 1);
+            G.add(vsIndex, n1, 1);
+        }
+        if (n2 !== null) {
+            G.add(n2, vsIndex, -1);
+            G.add(vsIndex, n2, -1);
+        }
+
+        I[vsIndex] = 0; // 0V drop
+    }
+
+    /**
+     * Stamp Voltmeter as very high resistance resistor (100MΩ)
+     */
+    stampVoltmeter(component, G) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+        const g = 1 / 1e8; // 100MΩ
+
+        if (n1 !== null) G.add(n1, n1, g);
+        if (n2 !== null) G.add(n2, n2, g);
+        if (n1 !== null && n2 !== null) {
+            G.add(n1, n2, -g);
+            G.add(n2, n1, -g);
+        }
     }
 
     /**
