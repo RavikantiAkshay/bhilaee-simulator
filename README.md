@@ -28,7 +28,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 ### State Management
 - **Persistent Storage** - Circuits are saved to browser local storage (manual save only).
 - **Templates** - Load predefined experiments by adding `?expId=template_name` to the URL.
-  - Example: `http://localhost:3000/?expId=verification_of_superposition_theorem`
+  - Example: `http://localhost:3000/?expId=basic-ee-exp-2`
 - **Manual Save** - Click "Save" to persist changes locally.
 - **Reset**: To revert to the original template, run `localStorage.removeItem('sim_state_EXP_ID')` in the console and reload.
 
