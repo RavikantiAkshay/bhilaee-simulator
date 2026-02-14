@@ -12,6 +12,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 - **Ground** - Reference node (0V)
 - **Junction** - Connection point for parallel circuits
 - **Ammeter** - Current measurement (0V source)
+- **Voltmeter** - Voltage measurement (High impedance)
 
 ### Analysis Types
 - **DC Analysis** - Steady-state DC operating point
@@ -29,6 +30,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 - **Persistent Storage** - Circuits are saved to browser local storage (manual save only).
 - **Templates** - Load predefined experiments by adding `?expId=template_name` to the URL.
   - Example: `http://localhost:3000/?expId=basic-ee-exp-2`
+  - Example: `http://localhost:3000/?expId=basic-ee-exp-3` (Thevenin Verification)
 - **Manual Save** - Click "Save" to persist changes locally.
 - **Reset**: To revert to the original template, run `localStorage.removeItem('sim_state_EXP_ID')` in the console and reload.
 
@@ -67,6 +69,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 | G | Place Ground |
 | J | Place Junction |
 | A | Place Ammeter |
+| M | Place Voltmeter |
 | Delete | Delete selected component |
 | Escape | Cancel current action |
 
