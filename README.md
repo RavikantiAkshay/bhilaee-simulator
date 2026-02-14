@@ -26,9 +26,11 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 - Interactive waveform chart with legend
 
 ### State Management
-- **Persistent Storage** - Circuits are saved to browser local storage (manual save only)
-- **Templates** - Experiments load from immutable template files by default (`?expId=name`)
-- **Manual Save** - Click "Save" to persist changes; Reload to reset to template (if unsaved)
+- **Persistent Storage** - Circuits are saved to browser local storage (manual save only).
+- **Templates** - Load predefined experiments by adding `?expId=template_name` to the URL.
+  - Example: `http://localhost:3000/?expId=verification_of_superposition_theorem`
+- **Manual Save** - Click "Save" to persist changes locally.
+- **Reset**: To revert to the original template, run `localStorage.removeItem('sim_state_EXP_ID')` in the console and reload.
 
 ## Getting Started
 
@@ -72,10 +74,12 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 
 ```
 src/
-├── components/     # Component classes (R, L, C, V, Ground, Junction)
+├── components/     # Component classes (R, L, C, V, Ground, Junction, Ammeter)
 ├── core/           # Core classes (CircuitGraph, Wire, Node)
 ├── simulation/     # Solvers (MNA, AC, Transient, Matrix utilities)
+├── templates/      # Circuit templates for standard experiments
 ├── ui/             # UI components (Canvas, Toolbar, PropertyPanel, Chart)
+├── utils/          # Utilities (State management, helpers)
 └── main.js         # Application entry point
 ```
 
