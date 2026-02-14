@@ -7,6 +7,6 @@ import { verification_of_superposition_theorem_template }
     from "./verification_of_superposition_theorem.js";
 
 export const circuitTemplates = {
-    verification_of_superposition_theorem:
+    "basic-ee-exp-2":
         verification_of_superposition_theorem_template
 };

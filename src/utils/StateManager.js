@@ -30,11 +30,30 @@ export class StateManager {
      */
     loadState() {
         try {
-            const raw = localStorage.getItem(this.storageKey);
-            if (raw) {
-                const state = JSON.parse(raw);
-                console.log(`StateManager: Loaded persistent state for ${this.expId}`);
-                return state;
+            // Check for forced new session
+            const urlParams = new URLSearchParams(window.location.search);
+            const isNewSession = urlParams.get('newSession') === 'true';
+
+            if (isNewSession) {
+                console.log(`StateManager: Forced new session for ${this.expId}`);
+
+                // Clear existing state to ensure fresh start
+                localStorage.removeItem(this.storageKey);
+
+                // Remove newSession from URL to allow future reloads to use saved state
+                urlParams.delete('newSession');
+                const newQuery = urlParams.toString();
+                const newUrl = window.location.pathname + (newQuery ? '?' + newQuery : '');
+                window.history.replaceState({}, '', newUrl);
+
+                // Fall through to load template
+            } else {
+                const raw = localStorage.getItem(this.storageKey);
+                if (raw) {
+                    const state = JSON.parse(raw);
+                    console.log(`StateManager: Loaded persistent state for ${this.expId}`);
+                    return state;
+                }
             }
 
             // Fallback: Check for template
