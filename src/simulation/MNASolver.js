@@ -19,6 +19,7 @@ export class MNASolver {
         this.nodes = [];        // List of node IDs (excluding ground)
         this.nodeMap = new Map();  // node ID -> matrix index
         this.voltageSources = []; // List of voltage sources
+        this.transformers = [];   // List of transformers
         this.result = null;
     }
 
@@ -144,7 +145,8 @@ export class MNASolver {
     buildACSystem(omega) {
         const n = this.nodes.length;
         const m = this.voltageSources.length;
-        const size = n + m;
+        const t = this.transformers.length;
+        const size = n + m + t;
 
         const Y = new ComplexMatrix(size, size);
         const I = new Array(size).fill(null).map(() => Complex.zero());
@@ -179,6 +181,12 @@ export class MNASolver {
                 this.stampACVoltageSource(component, Y, I);
                 break;
             case 'Ground':
+                break;
+            case 'Transformer':
+                this.stampACTransformer(component, Y, I, omega);
+                break;
+            case 'Voltmeter':
+                this.stampACVoltmeter(component, Y);
                 break;
         }
     }
@@ -268,6 +276,105 @@ export class MNASolver {
 
         I[vsIndex] = Vphasor;
     }
+
+    /**
+     * Stamp Voltmeter for AC (high resistance)
+     */
+    stampACVoltmeter(component, Y) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+        const g = Complex.fromReal(1 / 1e8);
+
+        if (n1 !== null) Y.add(n1, n1, g);
+        if (n2 !== null) Y.add(n2, n2, g);
+        if (n1 !== null && n2 !== null) {
+            Y.add(n1, n2, g.neg());
+            Y.add(n2, n1, g.neg());
+        }
+    }
+
+    /**
+     * Stamp non-ideal transformer for AC analysis.
+     * Full complex impedance model:
+     *   - Series: Zeq = Req + jXeq between P+ and n_mid
+     *   - Shunt:  Ysh = 1/Rc + 1/(jXm) between n_mid and P-
+     *   - Ideal transformer: a:1 coupling n_mid/P- to S+/S-
+     */
+    stampACTransformer(component, Y, I, omega) {
+        const a = component.properties.turnsRatio;
+        const Req = component.properties.Req;
+        const Xeq = component.properties.Xeq;
+        const Rc = component.properties.Rc;
+        const Xm = component.properties.Xm;
+
+        // Terminal node indices
+        const nPP = this.getNodeIndex(component.terminals[0]); // primary_pos
+        const nPN = this.getNodeIndex(component.terminals[1]); // primary_neg
+        const nSP = this.getNodeIndex(component.terminals[2]); // secondary_pos
+        const nSN = this.getNodeIndex(component.terminals[3]); // secondary_neg
+
+        // Internal node
+        const internalNodeId = `__xfmr_mid_${component.id}`;
+        const nMid = this.nodeMap.get(internalNodeId);
+
+        // Extra MNA row index
+        const xfmrIdx = this.transformers.indexOf(component);
+        const iPrimIdx = this.nodes.length + this.voltageSources.length + xfmrIdx;
+
+        // 1. Stamp Zeq = Req + jXeq between P+ and n_mid
+        //    Admittance Yeq = 1 / (Req + jXeq)
+        const Zeq_re = Req;
+        const Zeq_im = Xeq; // Xeq = ωLeq, already given as reactance value
+        const Zeq_mag2 = Zeq_re * Zeq_re + Zeq_im * Zeq_im;
+        const Yeq = new Complex(Zeq_re / Zeq_mag2, -Zeq_im / Zeq_mag2); // 1/(R+jX)
+
+        if (nPP !== null) Y.add(nPP, nPP, Yeq);
+        if (nMid !== null) Y.add(nMid, nMid, Yeq);
+        if (nPP !== null && nMid !== null) {
+            Y.add(nPP, nMid, Yeq.neg());
+            Y.add(nMid, nPP, Yeq.neg());
+        }
+
+        // 2. Stamp shunt branch: Ysh = 1/Rc + 1/(jXm)
+        //    1/Rc is real conductance
+        //    1/(jXm) = -j/Xm (susceptance)
+        const Ysh = new Complex(1 / Rc, -1 / Xm);
+
+        if (nMid !== null) Y.add(nMid, nMid, Ysh);
+        if (nPN !== null) Y.add(nPN, nPN, Ysh);
+        if (nMid !== null && nPN !== null) {
+            Y.add(nMid, nPN, Ysh.neg());
+            Y.add(nPN, nMid, Ysh.neg());
+        }
+
+        // 3. Stamp ideal transformer constraint (same structure as DC, but complex)
+        const one = Complex.one();
+        const negOne = one.neg();
+        const ca = Complex.fromReal(a);
+        const cInvA = Complex.fromReal(1 / a);
+
+        // Voltage constraint row:
+        // V(n_mid) - V(P-) - a*V(S+) + a*V(S-) = 0
+        if (nMid !== null) {
+            Y.add(iPrimIdx, nMid, one);
+            Y.add(nMid, iPrimIdx, one);    // KCL: I_p enters n_mid
+        }
+        if (nPN !== null) {
+            Y.add(iPrimIdx, nPN, negOne);
+            Y.add(nPN, iPrimIdx, negOne);  // KCL: I_p leaves P-
+        }
+        if (nSP !== null) {
+            Y.add(iPrimIdx, nSP, ca.neg());
+            Y.add(nSP, iPrimIdx, cInvA);   // KCL: I_p/a enters S+
+        }
+        if (nSN !== null) {
+            Y.add(iPrimIdx, nSN, ca);
+            Y.add(nSN, iPrimIdx, cInvA.neg()); // KCL: I_p/a leaves S-
+        }
+
+        I[iPrimIdx] = Complex.zero();
+    }
     /**
      * Build list of unique nodes from circuit
      */
@@ -275,6 +382,7 @@ export class MNASolver {
         this.nodes = [];
         this.nodeMap = new Map();
         this.voltageSources = [];
+        this.transformers = [];
 
         const nodeSet = new Set();
         const components = this.circuit.getAllComponents();
@@ -284,6 +392,11 @@ export class MNASolver {
             // Track voltage sources and ammeters
             if (component.constructor.name === 'VoltageSource' || component.constructor.name === 'Ammeter') {
                 this.voltageSources.push(component);
+            }
+
+            // Track transformers
+            if (component.constructor.name === 'Transformer') {
+                this.transformers.push(component);
             }
 
             for (const terminal of component.terminals) {
@@ -297,6 +410,13 @@ export class MNASolver {
 
         // Convert to array and create index map
         this.nodes = Array.from(nodeSet);
+
+        // Add internal nodes for each transformer (n_mid)
+        for (let i = 0; i < this.transformers.length; i++) {
+            const internalNodeId = `__xfmr_mid_${this.transformers[i].id}`;
+            this.nodes.push(internalNodeId);
+        }
+
         this.nodes.forEach((nodeId, index) => {
             this.nodeMap.set(nodeId, index);
         });
@@ -365,7 +485,8 @@ export class MNASolver {
     buildMNASystem() {
         const n = this.nodes.length;
         const m = this.voltageSources.length;
-        const size = n + m;
+        const t = this.transformers.length;  // Each transformer adds 1 row (primary current / voltage constraint)
+        const size = n + m + t;
 
         const G = new Matrix(size, size);
         const I = new Array(size).fill(0);
@@ -404,6 +525,12 @@ export class MNASolver {
                 break;
             case 'Ground':
                 // Ground is reference, handled separately
+                break;
+            case 'Transformer':
+                this.stampTransformer(component, G, I);
+                break;
+            case 'Voltmeter':
+                this.stampVoltmeter(component, G);
                 break;
         }
     }
@@ -468,6 +595,138 @@ export class MNASolver {
 
         // Voltage constraint
         I[vsIndex] = V;
+    }
+
+    /**
+     * Stamp Voltmeter as a very high resistance
+     */
+    stampVoltmeter(component, G) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+        const g = 1 / 1e8; // 100M Ohm
+
+        if (n1 !== null) G.add(n1, n1, g);
+        if (n2 !== null) G.add(n2, n2, g);
+        if (n1 !== null && n2 !== null) {
+            G.add(n1, n2, -g);
+            G.add(n2, n1, -g);
+        }
+    }
+
+    /**
+     * Stamp non-ideal transformer for DC analysis.
+     * 
+     * Equivalent circuit (referred to primary):
+     *   P+ ──[ Req ]── n_mid ──┬── ideal xfmr (a:1) ── S+
+     *                          │
+     *                          Rc (shunt)
+     *                          │
+     *   P− ────────────────────┴──────────────────────── S−
+     * 
+     * DC: Xeq = 0 (short), Xm = ∞ (open)
+     * So only Req (series) and Rc (shunt) remain.
+     * 
+     * Ideal transformer adds 2 extra MNA rows:
+     *   Row i1: KCL at n_mid includes primary current I_p
+     *           V(n_mid) - V(P-) = a * (V(S+) - V(S-))
+     *   Row i2: I_p + I_s/a = 0  (or equivalently, a*I_p + I_s = 0)
+     *
+     * We use the standard MNA ideal transformer stamp:
+     *   Extra variable: I_p (primary winding current through ideal xfmr)
+     *   Constraint: V(n_mid) - V(P-) - a*(V(S+) - V(S-)) = 0
+     *   KCL contribution: I_p enters n_mid, a*I_p enters S+ (with sign conventions)
+     */
+    stampTransformer(component, G, I) {
+        const a = component.properties.turnsRatio;
+        const Req = component.properties.Req;
+        const Rc = component.properties.Rc;
+
+        // Terminal node indices
+        const nPP = this.getNodeIndex(component.terminals[0]); // primary_pos
+        const nPN = this.getNodeIndex(component.terminals[1]); // primary_neg
+        const nSP = this.getNodeIndex(component.terminals[2]); // secondary_pos
+        const nSN = this.getNodeIndex(component.terminals[3]); // secondary_neg
+
+        // Internal node: junction between Req and ideal transformer primary
+        const xfmrIdx = this.transformers.indexOf(component);
+        const internalNodeId = `__xfmr_mid_${component.id}`;
+        const nMid = this.nodeMap.get(internalNodeId);
+
+        // Extra MNA row indices for this transformer
+        // After all nodes and voltage sources, we have transformer rows
+        const iPrimIdx = this.nodes.length + this.voltageSources.length + xfmrIdx;
+
+        // 1. Stamp Req between P+ and n_mid
+        if (Req > 0) {
+            const gReq = 1 / Req;
+            if (nPP !== null) G.add(nPP, nPP, gReq);
+            if (nMid !== null) G.add(nMid, nMid, gReq);
+            if (nPP !== null && nMid !== null) {
+                G.add(nPP, nMid, -gReq);
+                G.add(nMid, nPP, -gReq);
+            }
+        }
+
+        // 2. Stamp Rc (shunt) between n_mid and P-
+        if (Rc > 0 && isFinite(Rc)) {
+            const gRc = 1 / Rc;
+            if (nMid !== null) G.add(nMid, nMid, gRc);
+            if (nPN !== null) G.add(nPN, nPN, gRc);
+            if (nMid !== null && nPN !== null) {
+                G.add(nMid, nPN, -gRc);
+                G.add(nPN, nMid, -gRc);
+            }
+        }
+
+        // 3. Stamp ideal transformer: V(n_mid) - V(P-) = a * (V(S+) - V(S-))
+        //    Uses two extra MNA variables.
+        //
+        //    We model the ideal transformer with:
+        //    Extra variable I_p (current into primary of ideal xfmr)
+        //
+        //    KCL at n_mid:  ... + I_p = 0   (I_p flows into n_mid from ideal xfmr)
+        //    KCL at P-:     ... - I_p = 0   (I_p returns via P-)
+        //    KCL at S+:     ... - a*I_p = 0 (secondary current = -I_p/a, but power balance)
+        //    KCL at S-:     ... + a*I_p = 0
+        //    Wait — let me use the standard formulation:
+        //
+        //    For ideal transformer with turns ratio a:
+        //    V1 = a * V2   and   I1 = -I2 / a
+        //    where V1 = V(n_mid) - V(P-), V2 = V(S+) - V(S-)
+        //    I1 = I_p (current into primary), I2 = current out of S+
+        //
+        //    MNA stamp (extra row for voltage constraint, I_p as extra variable):
+        //    Row iPrimIdx (voltage constraint): V(n_mid) - V(P-) - a*(V(S+) - V(S-)) = 0
+        //    Column iPrimIdx (current I_p contributes to KCL):
+        //      At n_mid: +1 * I_p  (current entering)
+        //      At P-:    -1 * I_p  (current leaving)
+        //      At S+:    +(1/a) * I_p  (secondary current = I_p/a entering S+... 
+        //                                 Actually: I2 = -I1/a = -I_p/a, 
+        //                                 so current INTO S+ is I_p/a)
+        //      At S-:    -(1/a) * I_p
+
+        // Voltage constraint row (iPrimIdx):
+        // V(n_mid) - V(P-) - a*V(S+) + a*V(S-) = 0
+        if (nMid !== null) {
+            G.add(iPrimIdx, nMid, 1);
+            G.add(nMid, iPrimIdx, 1);  // KCL: I_p enters n_mid
+        }
+        if (nPN !== null) {
+            G.add(iPrimIdx, nPN, -1);
+            G.add(nPN, iPrimIdx, -1);  // KCL: I_p leaves P-
+        }
+        if (nSP !== null) {
+            G.add(iPrimIdx, nSP, -a);
+            G.add(nSP, iPrimIdx, 1 / a); // KCL: I_p/a enters S+
+        }
+        if (nSN !== null) {
+            G.add(iPrimIdx, nSN, a);
+            G.add(nSN, iPrimIdx, -1 / a); // KCL: I_p/a leaves S-
+        }
+
+        // Voltage constraint: V(n_mid) - V(P-) - a*(V(S+) - V(S-)) = 0
+        I[iPrimIdx] = 0;
     }
 
     /**

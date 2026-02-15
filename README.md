@@ -13,6 +13,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 - **Junction** - Connection point for parallel circuits
 - **Ammeter** - Current measurement (0V source)
 - **Voltmeter** - Voltage measurement (High impedance)
+- **Transformer** - Non-ideal single-phase transformer (configurable Req, Xeq, Rc, Xm)
 
 ### Analysis Types
 - **DC Analysis** - Steady-state DC operating point
@@ -70,6 +71,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 | J | Place Junction |
 | A | Place Ammeter |
 | M | Place Voltmeter |
+| T | Place Transformer |
 | Delete | Delete selected component |
 | Escape | Cancel current action |
 
@@ -77,7 +79,7 @@ A browser-based RLC circuit simulator with real-time visualization and analysis 
 
 ```
 src/
-├── components/     # Component classes (R, L, C, V, Ground, Junction, Ammeter)
+├── components/     # Component classes (R, L, C, V, Ground, Junction, Ammeter, Voltmeter, Transformer)
 ├── core/           # Core classes (CircuitGraph, Wire, Node)
 ├── simulation/     # Solvers (MNA, AC, Transient, Matrix utilities)
 ├── templates/      # Circuit templates for standard experiments
