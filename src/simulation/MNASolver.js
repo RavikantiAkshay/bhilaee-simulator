@@ -19,7 +19,9 @@ export class MNASolver {
         this.nodes = [];        // List of node IDs (excluding ground)
         this.nodeMap = new Map();  // node ID -> matrix index
         this.voltageSources = []; // List of voltage sources
+
         this.transformers = [];   // List of transformers
+        this.threePhaseSources = []; // List of 3-phase sources
         this.result = null;
     }
 
@@ -146,7 +148,8 @@ export class MNASolver {
         const n = this.nodes.length;
         const m = this.voltageSources.length;
         const t = this.transformers.length;
-        const size = n + m + t;
+        const tp = this.threePhaseSources ? this.threePhaseSources.length : 0;
+        const size = n + m + t + 3 * tp;
 
         const Y = new ComplexMatrix(size, size);
         const I = new Array(size).fill(null).map(() => Complex.zero());
@@ -190,6 +193,10 @@ export class MNASolver {
                 break;
             case 'Wattmeter':
                 this.stampACWattmeter(component, Y, I);
+                break;
+
+            case 'ThreePhaseSource':
+                this.stampThreePhaseSource(component, Y, I);
                 break;
         }
     }
@@ -444,6 +451,11 @@ export class MNASolver {
             // Track transformers
             if (component.constructor.name === 'Transformer') {
                 this.transformers.push(component);
+            }
+
+            // Track 3-phase sources
+            if (component.constructor.name === 'ThreePhaseSource') {
+                this.threePhaseSources.push(component);
             }
 
             for (const terminal of component.terminals) {
@@ -857,6 +869,59 @@ export class MNASolver {
 
         return output;
     }
+
+    /**
+     * Stamp Three Phase Source (Star/Wye)
+     * Adds 3 voltage constraints constraints (R-N, Y-N, B-N)
+     */
+    stampThreePhaseSource(component, Y, I) {
+        // Terminals: R(0), Y(1), B(2), N(3)
+        const nR = this.getNodeIndex(component.terminals[0]);
+        const nY = this.getNodeIndex(component.terminals[1]);
+        const nB = this.getNodeIndex(component.terminals[2]);
+        const nN = this.getNodeIndex(component.terminals[3]);
+
+        // Base index for 3 extra rows
+        const tpIdx = this.threePhaseSources.indexOf(component);
+        const baseRow = this.nodes.length + this.voltageSources.length + this.transformers.length + 3 * tpIdx;
+
+        // Vp = V_LL / sqrt(3)
+        const Vp = component.properties.voltage / Math.sqrt(3);
+        const freq = component.properties.frequency;
+        const phaseShift = component.properties.phaseShift || 0;
+
+        // Phases: 0, -120, 120 relative to phaseShift
+        const phases = [0, -120, 120];
+
+        // Loop for 3 phases: 0=R, 1=Y, 2=B
+        const nodeIndices = [nR, nY, nB];
+
+        for (let k = 0; k < 3; k++) {
+            const rowIdx = baseRow + k;
+            const nPhase = nodeIndices[k];
+
+            // Calculate Phasor
+            const phi = (phaseShift + phases[k]) * Math.PI / 180;
+            const Vphasor = Complex.fromPolar(Vp, phi);
+
+            // Stamp Constraint: V(Phase) - V(Neutral) = Vphasor
+            // Row 'rowIdx' enforces this.
+
+            const one = Complex.one();
+
+            if (nPhase !== null) {
+                Y.add(rowIdx, nPhase, one);      // +V(Phase)
+                Y.add(nPhase, rowIdx, one);      // Current entering Phase terminal
+            }
+
+            if (nN !== null) {
+                Y.add(rowIdx, nN, one.neg());    // -V(Neutral)
+                Y.add(nN, rowIdx, one.neg());    // Current leaving Neutral terminal
+            }
+
+            I[rowIdx] = Vphasor;
+        }
+    }
 }
 
 /**
@@ -870,4 +935,5 @@ export function testMNASolver(circuitGraph) {
     console.log('3. Place a Ground (G key)');
     console.log('4. Connect: V+ to R, R to Ground, V- to Ground');
     console.log('Then run: circuitSimulator.runDC()');
+
 }
