@@ -16,6 +16,7 @@ import { Junction } from './Junction.js';
 import { Ammeter } from './Ammeter.js';
 import { Voltmeter } from './Voltmeter.js';
 import { Transformer } from './Transformer.js';
+import { Wattmeter } from './Wattmeter.js';
 
 /**
  * List of all available components
@@ -30,7 +31,8 @@ export const COMPONENTS = [
     Inductor,
     Ammeter,
     Voltmeter,
-    Transformer
+    Transformer,
+    Wattmeter
 ];
 
 /**
@@ -84,4 +86,4 @@ export function getComponentByShortcut(key) {
 }
 
 // Re-export component classes for convenience
-export { Resistor, Capacitor, Inductor, Ground, VoltageSource, Junction, Ammeter, Voltmeter, Transformer };
+export { Resistor, Capacitor, Inductor, Ground, VoltageSource, Junction, Ammeter, Voltmeter, Transformer, Wattmeter };

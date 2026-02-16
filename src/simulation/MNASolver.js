@@ -188,6 +188,9 @@ export class MNASolver {
             case 'Voltmeter':
                 this.stampACVoltmeter(component, Y);
                 break;
+            case 'Wattmeter':
+                this.stampACWattmeter(component, Y, I);
+                break;
         }
     }
 
@@ -295,6 +298,42 @@ export class MNASolver {
     }
 
     /**
+     * Stamp Wattmeter for AC analysis.
+     * Current coil (M-L): 0V voltage source
+     * Voltage coil (C-V): 100MΩ resistor
+     */
+    stampACWattmeter(component, Y, I) {
+        // Current coil (M-L): 0V voltage source
+        const nM = this.getNodeIndex(component.terminals[0]); // M
+        const nL = this.getNodeIndex(component.terminals[1]); // L
+        const vsIndex = this.nodes.length + this.voltageSources.indexOf(component);
+
+        const one = Complex.one();
+
+        if (nM !== null) {
+            Y.add(nM, vsIndex, one);
+            Y.add(vsIndex, nM, one);
+        }
+        if (nL !== null) {
+            Y.add(nL, vsIndex, one.neg());
+            Y.add(vsIndex, nL, one.neg());
+        }
+        I[vsIndex] = Complex.zero();
+
+        // Voltage coil (C-V): high resistance
+        const nC = this.getNodeIndex(component.terminals[2]); // C
+        const nV = this.getNodeIndex(component.terminals[3]); // V
+        const g = Complex.fromReal(1 / 1e8);
+
+        if (nC !== null) Y.add(nC, nC, g);
+        if (nV !== null) Y.add(nV, nV, g);
+        if (nC !== null && nV !== null) {
+            Y.add(nC, nV, g.neg());
+            Y.add(nV, nC, g.neg());
+        }
+    }
+
+    /**
      * Stamp non-ideal transformer for AC analysis.
      * Full complex impedance model:
      *   - Series: Zeq = Req + jXeq between P+ and n_mid
@@ -389,8 +428,9 @@ export class MNASolver {
 
         // Collect all terminals
         for (const component of components) {
-            // Track voltage sources and ammeters
-            if (component.constructor.name === 'VoltageSource' || component.constructor.name === 'Ammeter') {
+            // Track voltage sources, ammeters, and wattmeter current coils
+            if (component.constructor.name === 'VoltageSource' || component.constructor.name === 'Ammeter'
+                || component.constructor.name === 'Wattmeter') {
                 this.voltageSources.push(component);
             }
 
@@ -532,6 +572,9 @@ export class MNASolver {
             case 'Voltmeter':
                 this.stampVoltmeter(component, G);
                 break;
+            case 'Wattmeter':
+                this.stampWattmeter(component, G, I);
+                break;
         }
     }
 
@@ -611,6 +654,43 @@ export class MNASolver {
         if (n1 !== null && n2 !== null) {
             G.add(n1, n2, -g);
             G.add(n2, n1, -g);
+        }
+    }
+
+    /**
+     * Stamp Wattmeter for DC analysis.
+     * Current coil (M-C, terminals[0]-terminals[1]): 0V voltage source (ammeter)
+     * Voltage coil (L-V, terminals[2]-terminals[3]): 100MΩ resistor (voltmeter)
+     */
+    stampWattmeter(component, G, I) {
+        // Current coil: 0V voltage source between M (0) and L (1)
+        const tM = component.terminals[0]; // M
+        const tL = component.terminals[1]; // L
+        const nM = this.getNodeIndex(tM);
+        const nL = this.getNodeIndex(tL);
+        const vsIndex = this.nodes.length + this.voltageSources.indexOf(component);
+
+        // Stamp 0V source for current coil
+        if (nM !== null) {
+            G.add(nM, vsIndex, 1);
+            G.add(vsIndex, nM, 1);
+        }
+        if (nL !== null) {
+            G.add(nL, vsIndex, -1);
+            G.add(vsIndex, nL, -1);
+        }
+        I[vsIndex] = 0; // 0V drop
+
+        // Voltage coil: high resistance between C (2) and V (3)
+        const nC = this.getNodeIndex(component.terminals[2]); // C
+        const nV = this.getNodeIndex(component.terminals[3]); // V
+        const g = 1 / 1e8; // 100M Ohm
+
+        if (nC !== null) G.add(nC, nC, g);
+        if (nV !== null) G.add(nV, nV, g);
+        if (nC !== null && nV !== null) {
+            G.add(nC, nV, -g);
+            G.add(nV, nC, -g);
         }
     }
 

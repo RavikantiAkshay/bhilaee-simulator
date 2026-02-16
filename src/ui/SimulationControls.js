@@ -135,12 +135,16 @@ export class SimulationControls {
 
         const currents = {};
         for (const [compId, current] of result.branchCurrents) {
+            const comp = this.circuit.components.get(compId);
+
+            // Skip Wattmeters (displayed in their own section)
+            if (comp && (comp.constructor.name === 'Wattmeter' || comp.type === 'wattmeter')) continue;
+
             const displayName = this.formatComponentName(compId);
             const absCurrent = Math.abs(current);
             currents[displayName] = absCurrent;
 
             // Update Ammeter component if applicable
-            const comp = this.circuit.components.get(compId);
             if (comp && comp.constructor.name === 'Ammeter') {
                 comp.setCurrent(absCurrent);
             }
@@ -164,7 +168,33 @@ export class SimulationControls {
             }
         }
 
-        this.displayResults({ voltages, currents, voltmeters });
+        // Process Wattmeters
+        const wattmeters = {};
+        for (const comp of this.circuit.components.values()) {
+            if (comp.constructor.name === 'Wattmeter') {
+                // Voltage coil (C-V): terminals[2] and terminals[3]
+                const nCId = solver.getNodeId(comp.terminals[2]);
+                const nVId = solver.getNodeId(comp.terminals[3]);
+
+                let vC = 0, vV = 0;
+                if (nCId && result.nodeVoltages.has(nCId)) vC = result.nodeVoltages.get(nCId);
+                if (nVId && result.nodeVoltages.has(nVId)) vV = result.nodeVoltages.get(nVId);
+                const voltage = vC - vV;
+
+                // Current coil (M-L): wattmeter is tracked as a voltage source
+                const currentData = result.branchCurrents.get(comp.id);
+                // MNA current direction for voltage source is M -> L?
+                // Voltage source current flows from + to - inside source? No, standard element: current enters + leaves -
+                // MNA I_src variable usually defined as current flowing from + through source to -.
+                // For 0V source, it's just the current in that branch.
+                const current = currentData ? Math.abs(currentData) : 0;
+
+                comp.setReadings(voltage, current);
+                wattmeters[comp.id] = { voltage, current, power: voltage * current };
+            }
+        }
+
+        this.displayResults({ voltages, currents, voltmeters, wattmeters });
 
         // Hide chart for DC (no time series)
         this.hideChart();
@@ -198,6 +228,11 @@ export class SimulationControls {
 
         const currents = {};
         for (const [compId, current] of result.branchCurrents) {
+            const comp = this.circuit.components.get(compId);
+
+            // Skip Wattmeters (displayed in their own section)
+            if (comp && (comp.constructor.name === 'Wattmeter' || comp.type === 'wattmeter')) continue;
+
             const displayName = this.formatComponentName(compId);
             const magnitude = current.magnitude();
             currents[displayName] = {
@@ -207,7 +242,6 @@ export class SimulationControls {
             };
 
             // Update Ammeter component if applicable (show magnitude)
-            const comp = this.circuit.components.get(compId);
             if (comp && comp.constructor.name === 'Ammeter') {
                 comp.setCurrent(magnitude);
             }
@@ -250,7 +284,67 @@ export class SimulationControls {
             }
         }
 
-        this.displayACResults({ voltages, currents, frequency });
+        // Process Wattmeters (AC)
+        const wattmeters = {};
+        for (const comp of this.circuit.components.values()) {
+            if (comp.constructor.name === 'Wattmeter') {
+                // Voltage coil (C-V): terminals[2] and terminals[3]
+                const nCId = solver.getNodeId(comp.terminals[2]);
+                const nVId = solver.getNodeId(comp.terminals[3]);
+
+                // Get V_C and V_V phasors
+                let vC = { re: 0, im: 0 }, vV = { re: 0, im: 0 };
+                // Using solver's Complex class if available or raw object
+                // The result.nodeVoltages values are instances of Complex class
+                const zero = { real: 0, imag: 0 }; // Fallback
+
+                if (nCId && result.nodeVoltages.has(nCId)) vC = result.nodeVoltages.get(nCId);
+                else vC = result.nodeVoltages.values().next().value.constructor.zero(); // Create zero complex
+
+                if (nVId && result.nodeVoltages.has(nVId)) vV = result.nodeVoltages.get(nVId);
+                else vV = result.nodeVoltages.values().next().value.constructor.zero();
+
+                // V_coil = V_C - V_V
+                const vCoil = vC.sub(vV);
+
+                // Current coil (M-L)
+                const currentData = result.branchCurrents.get(comp.id);
+                // AC current is a phasor. Direction matches 0V source definition (M->L positive?)
+                // Assuming standard definition.
+                const iCoil = currentData || vC.constructor.zero();
+
+                // Compute Power: S = V * conj(I)
+                // P = Re(S) = Re(V * conj(I))
+                // Q = Im(S)
+                // Complex class might not have conj(), let's check or implement manually
+                // conj(a+jb) = a-jb
+                // mul: (ac - bd) + j(ad + bc)
+                // Let V = a+jb, I = c+jd, conj(I) = c-jd
+                // S = (a+jb)(c-jd) = (ac + bd) + j(-ad + bc)
+
+                const P = vCoil.real * iCoil.real + vCoil.imag * iCoil.imag;
+                // const Q = vCoil.imag * iCoil.real - vCoil.real * iCoil.imag;
+
+                const Vmag = vCoil.magnitude();
+                const Imag = iCoil.magnitude();
+
+                comp.setReadings(Vmag, Imag); // Set properties (magnitude only for simple view)
+                // We can store P separately
+                comp.properties.power = P;
+
+                wattmeters[comp.id] = {
+                    voltage: Vmag,
+                    current: Imag,
+                    power: P,
+                    complexPower: {
+                        real: P,
+                        apparent: Vmag * Imag
+                    }
+                };
+            }
+        }
+
+        this.displayACResults({ voltages, currents, frequency, wattmeters });
     }
 
     /**
@@ -259,8 +353,9 @@ export class SimulationControls {
     displayACResults(results) {
         if (!results || !this.outputContent) return;
 
-        let html = `<div class="simulation-results">`;
-        html += `<div class="result-section"><h4>AC Analysis @ ${results.frequency} Hz</h4></div>`;
+        const freq = results.frequency;
+        let html = `<div class="simulation-results">
+            <div class="result-header">AC Analysis (${freq} Hz)</div>`;
 
         // Node voltages
         if (Object.keys(results.voltages).length > 0) {
@@ -281,6 +376,29 @@ export class SimulationControls {
                 html += `<div class="output-result">
                     <span class="result-label">${comp}</span>
                     <span class="result-value">${(i.magnitude * 1000).toFixed(4)} mA ∠ ${i.phase.toFixed(1)}°</span>
+                </div>`;
+            }
+            html += '</div>';
+        }
+
+        // Wattmeter readings
+        if (results.wattmeters) {
+            html += '<div class="result-section"><h4>⚡ Wattmeter Readings</h4>';
+            for (const [id, data] of Object.entries(results.wattmeters)) {
+                const comp = this.circuit.components.get(id);
+                const label = comp ? 'Wattmeter' : id;
+
+                html += `<div class="output-result">
+                    <span class="result-label">${label} (${id.replace('comp_', '')})</span>
+                    <span class="result-value">${data.power.toFixed(4)} W</span>
+                </div>
+                <div class="output-result" style="padding-left: 16px; opacity: 0.8;">
+                    <span class="result-label">V(C-V)</span>
+                    <span class="result-value">${data.voltage.toFixed(4)} V</span>
+                </div>
+                <div class="output-result" style="padding-left: 16px; opacity: 0.8;">
+                    <span class="result-label">I(M-L)</span>
+                    <span class="result-value">${(data.current * 1000).toFixed(4)} mA</span>
                 </div>`;
             }
             html += '</div>';
@@ -570,7 +688,7 @@ export class SimulationControls {
         let html = '<div class="simulation-results">';
 
         // Node voltages
-        if (results.voltages) {
+        if (results.voltages && Object.keys(results.voltages).length > 0) {
             html += '<div class="result-section"><h4>Node Voltages</h4>';
             for (const [node, voltage] of Object.entries(results.voltages)) {
                 html += `<div class="output-result">
@@ -582,7 +700,7 @@ export class SimulationControls {
         }
 
         // Component currents
-        if (results.currents) {
+        if (results.currents && Object.keys(results.currents).length > 0) {
             html += '<div class="result-section"><h4>Currents</h4>';
             for (const [comp, current] of Object.entries(results.currents)) {
                 html += `<div class="output-result">
@@ -594,7 +712,7 @@ export class SimulationControls {
         }
 
         // Voltmeter readings
-        if (results.voltmeters) {
+        if (results.voltmeters && Object.keys(results.voltmeters).length > 0) {
             html += '<div class="result-section"><h4>Voltmeter Readings</h4>';
             for (const [id, voltage] of Object.entries(results.voltmeters)) {
                 // Try to get component name or label
@@ -608,6 +726,31 @@ export class SimulationControls {
             }
             html += '</div>';
         }
+
+        // Wattmeter readings
+        if (results.wattmeters && Object.keys(results.wattmeters).length > 0) {
+            html += '<div class="result-section"><h4>⚡ Wattmeter Readings</h4>';
+            for (const [id, data] of Object.entries(results.wattmeters)) {
+                const comp = this.circuit.components.get(id);
+                const label = comp ? 'Wattmeter' : id;
+
+                html += `<div class="output-result">
+                    <span class="result-label">${label} (${id.replace('comp_', '')})</span>
+                    <span class="result-value">${data.power.toFixed(4)} W</span>
+                </div>
+                <div class="output-result" style="padding-left: 16px; opacity: 0.8;">
+                    <span class="result-label">V(C-V)</span>
+                    <span class="result-value">${data.voltage.toFixed(4)} V</span>
+                </div>
+                <div class="output-result" style="padding-left: 16px; opacity: 0.8;">
+                    <span class="result-label">I(M-L)</span>
+                    <span class="result-value">${(data.current * 1000).toFixed(4)} mA</span>
+                </div>`;
+            }
+            html += '</div>';
+        }
+
+
 
         html += '</div>';
 
