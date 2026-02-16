@@ -306,7 +306,7 @@ export class CircuitGraph {
         // Check for floating terminals
         for (const component of this.components.values()) {
             for (const terminal of component.terminals) {
-                if (!terminal.isConnected() && component.type !== 'ground') {
+                if (!terminal.isConnected() && component.type !== 'ground' && component.type !== 'transformer') {
                     errors.push(`${component.getLabel()} has unconnected terminal: ${terminal.name}`);
                 }
             }

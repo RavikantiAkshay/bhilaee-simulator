@@ -169,10 +169,14 @@ export class Wattmeter extends Component {
     /**
      * Update wattmeter readings from simulation
      */
-    setReadings(voltage, current) {
+    setReadings(voltage, current, power = null) {
         this.properties.voltage = voltage;
         this.properties.current = current;
-        this.properties.power = voltage * current;
+        if (power !== null) {
+            this.properties.power = power;
+        } else {
+            this.properties.power = voltage * current; // Fallback to S if P not provided
+        }
 
         if (this.element) {
             const valueText = this.element.querySelector('.component-value');

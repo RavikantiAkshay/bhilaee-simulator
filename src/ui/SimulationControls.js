@@ -189,8 +189,9 @@ export class SimulationControls {
                 // For 0V source, it's just the current in that branch.
                 const current = currentData ? Math.abs(currentData) : 0;
 
-                comp.setReadings(voltage, current);
-                wattmeters[comp.id] = { voltage, current, power: voltage * current };
+                const power = voltage * current;
+                comp.setReadings(voltage, current, power);
+                wattmeters[comp.id] = { voltage, current, power };
             }
         }
 
@@ -328,9 +329,8 @@ export class SimulationControls {
                 const Vmag = vCoil.magnitude();
                 const Imag = iCoil.magnitude();
 
-                comp.setReadings(Vmag, Imag); // Set properties (magnitude only for simple view)
-                // We can store P separately
-                comp.properties.power = P;
+                comp.setReadings(Vmag, Imag, P); // Set readings with Real Power
+                // comp.properties.power = P; // Handled in setReadings
 
                 wattmeters[comp.id] = {
                     voltage: Vmag,

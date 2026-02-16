@@ -4,7 +4,7 @@
  */
 
 export const verification_of_superposition_theorem_template = {
-    expId: "verification_of_superposition_theorem",
+    expId: "basic-ee-exp-2",
     circuitType: "dc_linear",
     components: [
         {

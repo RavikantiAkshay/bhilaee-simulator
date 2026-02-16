@@ -361,6 +361,13 @@ export class MNASolver {
         const xfmrIdx = this.transformers.indexOf(component);
         const iPrimIdx = this.nodes.length + this.voltageSources.length + xfmrIdx;
 
+        // Add small leakage to ground for stability
+        const gleak = new Complex(1e-12, 0);
+        if (nPP !== null) Y.add(nPP, nPP, gleak);
+        if (nPN !== null) Y.add(nPN, nPN, gleak);
+        if (nSP !== null) Y.add(nSP, nSP, gleak);
+        if (nSN !== null) Y.add(nSN, nSN, gleak);
+
         // 1. Stamp Zeq = Req + jXeq between P+ and n_mid
         //    Admittance Yeq = 1 / (Req + jXeq)
         const Zeq_re = Req;
@@ -736,6 +743,13 @@ export class MNASolver {
         // Extra MNA row indices for this transformer
         // After all nodes and voltage sources, we have transformer rows
         const iPrimIdx = this.nodes.length + this.voltageSources.length + xfmrIdx;
+
+        // Add small leakage to ground for stability (prevents singular matrix for floating terminals)
+        const gleak = 1e-12;
+        if (nPP !== null) G.add(nPP, nPP, gleak);
+        if (nPN !== null) G.add(nPN, nPN, gleak);
+        if (nSP !== null) G.add(nSP, nSP, gleak);
+        if (nSN !== null) G.add(nSN, nSN, gleak);
 
         // 1. Stamp Req between P+ and n_mid
         if (Req > 0) {
