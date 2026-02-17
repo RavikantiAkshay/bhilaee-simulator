@@ -22,6 +22,7 @@ export class SimulationControls {
         this.btnStop = document.getElementById('btn-stop');
         this.btnReset = document.getElementById('btn-reset');
         this.analysisType = document.getElementById('analysis-type');
+        this.frequencyInput = document.getElementById('ac-frequency');
         this.simTime = document.getElementById('sim-time');
         this.timeStep = document.getElementById('time-step');
 
@@ -623,6 +624,7 @@ export class SimulationControls {
     getSettings() {
         return {
             analysisType: this.analysisType?.value || 'dc',
+            frequency: parseFloat(this.frequencyInput?.value) || 60,
             simulationTime: parseFloat(this.simTime?.value) || 0.01,
             timeStep: parseFloat(this.timeStep?.value) || 0.0001
         };
