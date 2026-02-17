@@ -12,6 +12,9 @@ import { transient_response_rlc_template }
 import { oc_sc_test_single_phase_transformer_template }
     from "./oc_sc_test_single_phase_transformer.js";
 
+import { three_phase_connections_template }
+    from "./three_phase_connections.js";
+
 import { power_factor_correction_template }
     from "./power_factor_correction.js";
 
@@ -26,5 +29,6 @@ export const circuitTemplates = {
         transient_response_rlc_template,
     "basic-ee-exp-5":
         oc_sc_test_single_phase_transformer_template,
-
+    "basic-ee-exp-6":
+        three_phase_connections_template,
 };

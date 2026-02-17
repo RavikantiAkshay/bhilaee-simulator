@@ -314,7 +314,7 @@ export class CircuitGraph {
 
         // Check for voltage source
         const hasSources = Array.from(this.components.values()).some(
-            c => c.type === 'voltage_source' || c.type === 'current_source'
+            c => c.type === 'voltage_source' || c.type === 'current_source' || c.type === 'three_phase_source'
         );
         if (!hasSources) {
             errors.push('Circuit needs at least one source');

@@ -271,18 +271,19 @@ export class SimulationControls {
                 // Let's assume standard operations. 
                 // result.nodeVoltages values are Complex instances.
 
-                let vdiff;
-                if (v1.sub) {
-                    vdiff = v1.sub(v2);
-                } else {
-                    // Fallback if APIs are missing (just use magnitude for display)
-                    // This is a safety catch
-                }
+                if (v1 && v2) {
+                    // Check if .sub method exists (it should if using Complex class)
+                    const vdiff = v1.sub ? v1.sub(v2) : { magnitude: () => 0, phaseDegrees: () => 0 };
 
-                // Temporary: only DC voltmeter requested really (Thevenin is DC usually in this context).
-                // But I should enable it.
-                // Let's assume we skip AC voltmeter diff calc for now to be safe, 
-                // OR just update the component with 0 if unknown.
+                    const mag = vdiff.magnitude();
+                    comp.setVoltage(mag);
+
+                    voltmeters[comp.id] = {
+                        magnitude: mag,
+                        phase: vdiff.phaseDegrees(),
+                        complex: vdiff
+                    };
+                }
             }
         }
 
@@ -345,7 +346,7 @@ export class SimulationControls {
             }
         }
 
-        this.displayACResults({ voltages, currents, frequency, wattmeters });
+        this.displayACResults({ voltages, currents, frequency, wattmeters, voltmeters });
     }
 
     /**
@@ -383,7 +384,7 @@ export class SimulationControls {
         }
 
         // Wattmeter readings
-        if (results.wattmeters) {
+        if (results.wattmeters && Object.keys(results.wattmeters).length > 0) {
             html += '<div class="result-section"><h4>⚡ Wattmeter Readings</h4>';
             for (const [id, data] of Object.entries(results.wattmeters)) {
                 const comp = this.circuit.components.get(id);
@@ -400,6 +401,20 @@ export class SimulationControls {
                 <div class="output-result" style="padding-left: 16px; opacity: 0.8;">
                     <span class="result-label">I(M-L)</span>
                     <span class="result-value">${(data.current * 1000).toFixed(4)} mA</span>
+                </div>`;
+            }
+            html += '</div>';
+        }
+
+        // Voltmeter readings
+        if (results.voltmeters && Object.keys(results.voltmeters).length > 0) {
+            html += '<div class="result-section"><h4>Voltmeter Readings</h4>';
+            for (const [id, val] of Object.entries(results.voltmeters)) {
+                const comp = this.circuit.components.get(id);
+                const label = comp ? 'Voltmeter' : id;
+                html += `<div class="output-result">
+                    <span class="result-label">${label} (${id.replace('comp_', '')})</span>
+                    <span class="result-value">${val.magnitude.toFixed(4)} V ∠ ${val.phase.toFixed(1)}°</span>
                 </div>`;
             }
             html += '</div>';
