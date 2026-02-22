@@ -7,6 +7,7 @@
 import { MNASolver } from '../simulation/MNASolver.js';
 import { TransientSolver } from '../simulation/TransientSolver.js';
 import { SimpleChart } from './SimpleChart.js';
+import { OscilloscopeChart } from './OscilloscopeChart.js';
 
 export class SimulationControls {
     /**
@@ -32,6 +33,12 @@ export class SimulationControls {
         this.chartContainer = document.getElementById('chart-container');
         this.chartClose = document.getElementById('chart-close');
         this.chart = null;
+
+        // Oscilloscope overlay
+        this.scopeOverlay = document.getElementById('scope-overlay');
+        this.scopeContainer = document.getElementById('scope-container');
+        this.scopeClose = document.getElementById('scope-close');
+        this.scopeChart = null;
 
         // State
         this.running = false;
@@ -62,6 +69,10 @@ export class SimulationControls {
 
         if (this.chartClose) {
             this.chartClose.addEventListener('click', () => this.hideChart());
+        }
+
+        if (this.scopeClose) {
+            this.scopeClose.addEventListener('click', () => this.hideScope());
         }
     }
 
@@ -200,6 +211,9 @@ export class SimulationControls {
 
         // Hide chart for DC (no time series)
         this.hideChart();
+
+        // Feed oscilloscopes (DC: flat line)
+        this.feedOscilloscopesDC(solver, result);
     }
 
     /**
@@ -347,6 +361,9 @@ export class SimulationControls {
         }
 
         this.displayACResults({ voltages, currents, frequency, wattmeters, voltmeters });
+
+        // Feed oscilloscopes (AC: synthesize waveform from phasor)
+        this.feedOscilloscopesAC(solver, result, frequency, settings);
     }
 
     /**
@@ -494,6 +511,9 @@ export class SimulationControls {
 
         // Show chart
         this.showChart(result.timePoints, result.results);
+
+        // Feed oscilloscopes (transient: time-series data)
+        this.feedOscilloscopesTransient(result);
     }
 
     /**
@@ -526,6 +546,285 @@ export class SimulationControls {
     hideChart() {
         if (this.chartOverlay) {
             this.chartOverlay.classList.remove('visible');
+        }
+    }
+
+    // ---- Oscilloscope Data Feed ----
+
+    /**
+     * Find all Oscilloscope components in the circuit.
+     */
+    findOscilloscopes() {
+        const scopes = [];
+        for (const comp of this.circuit.components.values()) {
+            if (comp.constructor.name === 'Oscilloscope') {
+                scopes.push(comp);
+            }
+        }
+        return scopes;
+    }
+
+    /**
+     * Feed oscilloscopes for DC analysis.
+     * Displays a flat line at the measured differential voltage.
+     */
+    feedOscilloscopesDC(solver, result) {
+        const scopes = this.findOscilloscopes();
+        if (scopes.length === 0) {
+            this.hideScope();
+            return;
+        }
+
+        const allChannels = [];
+        for (const scope of scopes) {
+            const channels = scope.getChannelConfig();
+            for (const ch of channels) {
+                let value = 0;
+                let unit = 'V';
+
+                if (ch.mode === 'Current') {
+                    // Find the virtual VS for this channel and read its branch current
+                    for (const vs of solver.voltageSources) {
+                        if (vs._isScopeChannel && vs._scopeComponent === scope && vs._channelId === ch.id) {
+                            const idx = solver.voltageSources.indexOf(vs);
+                            if (result.branchCurrents) {
+                                // branchCurrents is a Map, but virtual VS uses the wrapper object
+                                // The current is stored by component reference
+                                for (const [compId, current] of result.branchCurrents) {
+                                    if (compId === vs || compId === scope.id + '_' + ch.id) {
+                                        value = Math.abs(current) * 1000; // mA
+                                        break;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    unit = 'mA';
+                } else {
+                    // Voltage mode
+                    const n1Id = solver.getNodeId(ch.posTerminal);
+                    const n2Id = solver.getNodeId(ch.negTerminal);
+                    let v1 = 0, v2 = 0;
+                    if (n1Id && result.nodeVoltages.has(n1Id)) v1 = result.nodeVoltages.get(n1Id);
+                    if (n2Id && result.nodeVoltages.has(n2Id)) v2 = result.nodeVoltages.get(n2Id);
+                    value = v1 - v2;
+                }
+
+                const timePoints = [0, 0.005, 0.01];
+                const values = [value, value, value];
+
+                allChannels.push({
+                    label: ch.label + ` (${value.toFixed(2)}${unit})`,
+                    color: ch.color,
+                    timePoints,
+                    values
+                });
+            }
+        }
+
+        if (allChannels.length > 0) {
+            this.showScope(allChannels);
+        }
+    }
+
+    /**
+     * Feed oscilloscopes for AC analysis.
+     * Synthesizes a sinusoidal waveform from phasor magnitude and phase.
+     */
+    feedOscilloscopesAC(solver, result, frequency, settings = {}) {
+        const scopes = this.findOscilloscopes();
+        if (scopes.length === 0) {
+            this.hideScope();
+            return;
+        }
+
+        // To ensure the trace isn't a straight line when measuring a 50Hz source 
+        // using the default 1000Hz analysis frequency, find the actual source frequency.
+        let plotFrequency = frequency;
+        // If settings frequency is exactly 1000 (default), try to find an actual AC source frequency
+        if (plotFrequency === 1000) {
+            for (const comp of this.circuit.components.values()) {
+                if (comp.constructor.name === 'VoltageSource' && comp.properties.type === 'ac') {
+                    if (comp.properties.frequency) {
+                        plotFrequency = comp.properties.frequency;
+                        break;
+                    }
+                }
+            }
+        }
+
+        const allChannels = [];
+        const T = 1 / plotFrequency;
+
+        // Use user-defined simulation time if available, otherwise show 2 cycles
+        const totalTime = settings.simulationTime ? settings.simulationTime : (2 * T);
+
+        // Scale number of points based on how many cycles we are trying to show
+        // Minimum 300 points, or 50 points per cycle, capped at 10000 points
+        const numCycles = totalTime / T;
+        const numPoints = Math.min(10000, Math.max(300, Math.ceil(numCycles * 50)));
+
+        const timePoints = [];
+        for (let i = 0; i < numPoints; i++) {
+            timePoints.push((i / (numPoints - 1)) * totalTime);
+        }
+
+        for (const scope of scopes) {
+            const channels = scope.getChannelConfig();
+            for (const ch of channels) {
+                let mag = 0, phaseRad = 0;
+                let unit = 'V';
+
+                if (ch.mode === 'Current') {
+                    // Read branch current phasor for this channel
+                    for (const vs of solver.voltageSources) {
+                        if (vs._isScopeChannel && vs._scopeComponent === scope && vs._channelId === ch.id) {
+                            for (const [compId, current] of result.branchCurrents) {
+                                if (compId === vs.id || compId === vs) {
+                                    mag = current.magnitude() * 1000; // mA
+                                    phaseRad = Math.atan2(current.imag, current.real);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    unit = 'mA';
+                } else {
+                    // Voltage mode
+                    const n1Id = solver.getNodeId(ch.posTerminal);
+                    const n2Id = solver.getNodeId(ch.negTerminal);
+                    let v1 = null, v2 = null;
+                    if (n1Id && result.nodeVoltages.has(n1Id)) v1 = result.nodeVoltages.get(n1Id);
+                    if (n2Id && result.nodeVoltages.has(n2Id)) v2 = result.nodeVoltages.get(n2Id);
+
+                    if (v1 && v2 && v1.sub) {
+                        const vdiff = v1.sub(v2);
+                        mag = vdiff.magnitude();
+                        phaseRad = Math.atan2(vdiff.imag, vdiff.real);
+                    } else if (v1) {
+                        mag = v1.magnitude ? v1.magnitude() : 0;
+                        phaseRad = v1.phase ? v1.phase() : 0;
+                    }
+                }
+
+                const omega = 2 * Math.PI * plotFrequency;
+                const values = timePoints.map(t => mag * Math.sin(omega * t + phaseRad));
+
+                let displayMag = mag;
+                let displayUnit = unit;
+                if (unit === 'mA' && mag >= 1000) {
+                    displayMag = mag / 1000;
+                    displayUnit = 'A';
+                }
+
+                allChannels.push({
+                    label: ch.label + ` (${displayMag.toFixed(2)}${displayUnit})`,
+                    color: ch.color,
+                    timePoints,
+                    values
+                });
+            }
+        }
+
+        if (allChannels.length > 0) {
+            this.showScope(allChannels);
+        }
+    }
+
+    /**
+     * Feed oscilloscopes for transient analysis.
+     * Extracts differential voltage time-series from simulation results.
+     */
+    feedOscilloscopesTransient(result) {
+        const scopes = this.findOscilloscopes();
+        if (scopes.length === 0) {
+            this.hideScope();
+            return;
+        }
+
+        const allChannels = [];
+
+        for (const scope of scopes) {
+            const channels = scope.getChannelConfig();
+            for (const ch of channels) {
+                let values;
+                let label = ch.label;
+
+                if (ch.mode === 'Current') {
+                    // Find the branch current time series for this channel
+                    // It's stored with key = virtual VS component ID or channel key
+                    const currentKey = scope.id + '_' + ch.id + '_I';
+                    let currentValues = null;
+                    for (const [nodeId, vals] of result.results) {
+                        if (nodeId === currentKey) {
+                            currentValues = vals;
+                            break;
+                        }
+                    }
+                    // Convert to mA
+                    values = result.timePoints.map((_, i) => {
+                        const raw = currentValues ? currentValues[i] : 0;
+                        return Math.abs(raw) * 1000;
+                    });
+                    label += ' (mA)';
+                } else {
+                    // Voltage mode: differential voltage
+                    const posId = ch.posTerminal.id;
+                    const negId = ch.negTerminal.id;
+
+                    let posValues = null, negValues = null;
+                    for (const [nodeId, vals] of result.results) {
+                        if (nodeId === posId) posValues = vals;
+                        if (nodeId === negId) negValues = vals;
+                    }
+
+                    values = result.timePoints.map((_, i) => {
+                        const v1 = posValues ? posValues[i] : 0;
+                        const v2 = negValues ? negValues[i] : 0;
+                        return v1 - v2;
+                    });
+                }
+
+                allChannels.push({
+                    label,
+                    color: ch.color,
+                    timePoints: [...result.timePoints],
+                    values
+                });
+            }
+        }
+
+        if (allChannels.length > 0) {
+            this.showScope(allChannels);
+        }
+    }
+
+    /**
+ * Show oscilloscope overlay with channel data.
+ */
+    showScope(channels) {
+        if (!this.scopeContainer || !this.scopeOverlay) return;
+
+        this.scopeOverlay.classList.add('visible');
+
+        setTimeout(() => {
+            if (!this.scopeChart) {
+                this.scopeChart = new OscilloscopeChart(this.scopeContainer);
+            } else {
+                this.scopeChart.resize();
+            }
+            this.scopeChart.setData(channels);
+        }, 50);
+    }
+
+    /**
+     * Hide oscilloscope overlay.
+     */
+    hideScope() {
+        if (this.scopeOverlay) {
+            this.scopeOverlay.classList.remove('visible');
         }
     }
 

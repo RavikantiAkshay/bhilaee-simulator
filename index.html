@@ -29,7 +29,8 @@
                 <span class="logo-text">Circuit Simulator</span>
             </div>
             <nav class="header-nav">
-                <a href="#" class="btn btn-secondary" id="btn-back-guide" onclick="window.location.href = CONFIG.GUIDE_URL; return false;">
+                <a href="#" class="btn btn-secondary" id="btn-back-guide"
+                    onclick="window.location.href = CONFIG.GUIDE_URL; return false;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M19 12H5" />
                         <polyline points="12 19 5 12 12 5" />
@@ -131,6 +132,14 @@
                         <button class="chart-close" id="chart-close">×</button>
                     </div>
                     <div class="chart-container" id="chart-container"></div>
+                </div>
+                <!-- Oscilloscope Overlay -->
+                <div class="scope-overlay" id="scope-overlay">
+                    <div class="chart-header">
+                        <span class="chart-title">🔬 Oscilloscope</span>
+                        <button class="chart-close" id="scope-close">×</button>
+                    </div>
+                    <div class="chart-container" id="scope-container"></div>
                 </div>
             </section>
 

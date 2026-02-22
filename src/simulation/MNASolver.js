@@ -160,6 +160,13 @@ export class MNASolver {
             this.stampACComponent(component, Y, I, omega);
         }
 
+        // Stamp virtual voltage sources (e.g. for Oscilloscope current channels)
+        for (const vs of this.voltageSources) {
+            if (vs._isScopeChannel) {
+                this.stampACVoltageSource(vs, Y, I);
+            }
+        }
+
         return { Y, I };
     }
 
@@ -201,6 +208,9 @@ export class MNASolver {
 
             case 'Load':
                 this.stampACLoad(component, Y, omega);
+                break;
+            case 'Oscilloscope':
+                this.stampACOscilloscope(component, Y);
                 break;
         }
     }
@@ -452,6 +462,26 @@ export class MNASolver {
                 this.voltageSources.push(component);
             }
 
+            // Track oscilloscope with current-mode channels (needs branch current variable)
+            if (component.constructor.name === 'Oscilloscope') {
+                const channels = component.getChannelConfig();
+                for (const ch of channels) {
+                    if (ch.mode === 'Current' && ch.posTerminal.isConnected() && ch.negTerminal.isConnected()) {
+                        // Register as a "virtual" voltage source for this channel
+                        // We store a wrapper object that the stamp method can identify
+                        this.voltageSources.push({
+                            id: component.id + '_' + ch.id,
+                            _isScopeChannel: true,
+                            _scopeComponent: component,
+                            _channelId: ch.id,
+                            terminals: [ch.posTerminal, ch.negTerminal],
+                            constructor: { name: 'OscilloscopeCurrentChannel' },
+                            properties: { voltage: 0 }
+                        });
+                    }
+                }
+            }
+
             // Track transformers
             if (component.constructor.name === 'Transformer') {
                 this.transformers.push(component);
@@ -560,6 +590,13 @@ export class MNASolver {
             this.stampComponent(component, G, I);
         }
 
+        // Stamp virtual voltage sources for oscilloscope current-mode channels
+        for (const vs of this.voltageSources) {
+            if (vs._isScopeChannel) {
+                this.stampVoltageSource(vs, G, I);
+            }
+        }
+
         return { G, I };
     }
 
@@ -600,6 +637,9 @@ export class MNASolver {
                 break;
             case 'Load':
                 this.stampLoad(component, G);
+                break;
+            case 'Oscilloscope':
+                this.stampOscilloscope(component, G, I);
                 break;
         }
     }
@@ -680,6 +720,72 @@ export class MNASolver {
         if (n1 !== null && n2 !== null) {
             G.add(n1, n2, -g);
             G.add(n2, n1, -g);
+        }
+    }
+
+    /**
+     * Stamp Oscilloscope — dual mode:
+     *   Voltage mode: high-Z (100MΩ) across channel pair (parallel measurement)
+     *   Current mode: 0V voltage source (series measurement, like ammeter)
+     *   + tiny ground leakage on all terminals for unconnected ones
+     */
+    stampOscilloscope(component, G, I) {
+        const gleak = 1e-12;
+
+        // Ground leakage on every terminal
+        for (const terminal of component.terminals) {
+            const n = this.getNodeIndex(terminal);
+            if (n !== null) G.add(n, n, gleak);
+        }
+
+        const channels = component.getChannelConfig();
+        for (const ch of channels) {
+            if (!ch.posTerminal.isConnected() || !ch.negTerminal.isConnected()) continue;
+
+            if (ch.mode === 'Voltage') {
+                // High impedance across pair (voltmeter mode)
+                const g = 1 / 1e8;
+                const n1 = this.getNodeIndex(ch.posTerminal);
+                const n2 = this.getNodeIndex(ch.negTerminal);
+                if (n1 !== null) G.add(n1, n1, g);
+                if (n2 !== null) G.add(n2, n2, g);
+                if (n1 !== null && n2 !== null) {
+                    G.add(n1, n2, -g);
+                    G.add(n2, n1, -g);
+                }
+            }
+            // Current mode is handled by stampVoltageSource (registered as virtual VS)
+        }
+    }
+
+    /**
+     * Stamp Oscilloscope for AC analysis (same logic, complex admittance).
+     */
+    stampACOscilloscope(component, Y) {
+        const gleak = 1e-12;
+
+        for (const terminal of component.terminals) {
+            const n = this.getNodeIndex(terminal);
+            if (n !== null) Y.add(n, n, Complex.fromReal(gleak));
+        }
+
+        const channels = component.getChannelConfig();
+        for (const ch of channels) {
+            if (!ch.posTerminal.isConnected() || !ch.negTerminal.isConnected()) continue;
+
+            if (ch.mode === 'Voltage') {
+                const g = 1 / 1e8;
+                const gComplex = Complex.fromReal(g);
+                const n1 = this.getNodeIndex(ch.posTerminal);
+                const n2 = this.getNodeIndex(ch.negTerminal);
+                if (n1 !== null) Y.add(n1, n1, gComplex);
+                if (n2 !== null) Y.add(n2, n2, gComplex);
+                if (n1 !== null && n2 !== null) {
+                    Y.add(n1, n2, gComplex.neg());
+                    Y.add(n2, n1, gComplex.neg());
+                }
+            }
+            // Current mode handled by stampVoltageSource
         }
     }
 

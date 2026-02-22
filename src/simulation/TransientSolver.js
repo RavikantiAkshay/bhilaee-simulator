@@ -168,6 +168,24 @@ export class TransientSolver {
                 this.voltageSources.push(component);
             }
 
+            // Oscilloscope current-mode channels need branch current variables
+            if (component.constructor.name === 'Oscilloscope') {
+                const channels = component.getChannelConfig();
+                for (const ch of channels) {
+                    if (ch.mode === 'Current' && ch.posTerminal.isConnected() && ch.negTerminal.isConnected()) {
+                        this.voltageSources.push({
+                            id: component.id + '_' + ch.id,
+                            _isScopeChannel: true,
+                            _scopeComponent: component,
+                            _channelId: ch.id,
+                            terminals: [ch.posTerminal, ch.negTerminal],
+                            constructor: { name: 'OscilloscopeCurrentChannel' },
+                            properties: { voltage: 0 }
+                        });
+                    }
+                }
+            }
+
             for (const terminal of component.terminals) {
                 const nodeId = this.getNodeId(terminal);
                 if (nodeId !== 'ground' && nodeId !== null) {
@@ -268,6 +286,13 @@ export class TransientSolver {
             this.stampComponent(component, G, I);
         }
 
+        // Stamp virtual voltage sources for oscilloscope current-mode channels
+        for (const vs of this.voltageSources) {
+            if (vs._isScopeChannel) {
+                this.stampAmmeter(vs, G, I);
+            }
+        }
+
         return solveLinearSystem(G, I);
     }
 
@@ -302,6 +327,42 @@ export class TransientSolver {
             case 'Load':
                 this.stampLoad(component, G, I);
                 break;
+            case 'Oscilloscope':
+                this.stampOscilloscope(component, G);
+                break;
+        }
+    }
+
+    /**
+     * Stamp Oscilloscope — dual mode:
+     *   Voltage mode: high-Z across channel pair
+     *   Current mode: handled by virtual voltage source
+     *   + ground leakage on all terminals
+     */
+    stampOscilloscope(component, G) {
+        const gleak = 1e-12;
+
+        for (const terminal of component.terminals) {
+            const n = this.getNodeIndex(terminal);
+            if (n !== null) G.add(n, n, gleak);
+        }
+
+        const channels = component.getChannelConfig();
+        for (const ch of channels) {
+            if (!ch.posTerminal.isConnected() || !ch.negTerminal.isConnected()) continue;
+
+            if (ch.mode === 'Voltage') {
+                const g = 1 / 1e8;
+                const n1 = this.getNodeIndex(ch.posTerminal);
+                const n2 = this.getNodeIndex(ch.negTerminal);
+                if (n1 !== null) G.add(n1, n1, g);
+                if (n2 !== null) G.add(n2, n2, g);
+                if (n1 !== null && n2 !== null) {
+                    G.add(n1, n2, -g);
+                    G.add(n2, n1, -g);
+                }
+            }
+            // Current mode: handled by virtual VS in voltageSources list
         }
     }
 

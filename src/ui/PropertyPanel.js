@@ -143,6 +143,11 @@ export class PropertyPanel {
                 option.selected = component.properties[definition.name] === opt;
                 input.appendChild(option);
             }
+        } else if (definition.type === 'checkbox') {
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'checkbox-input';
+            input.checked = component.properties[definition.name];
         } else {
             input = document.createElement('input');
             input.type = definition.type === 'number' ? 'number' : 'text';
@@ -174,13 +179,17 @@ export class PropertyPanel {
 
         // Handle value change
         const updateValue = () => {
-            let value = input.value;
-
-            if (definition.type === 'number') {
-                value = parseFloat(value);
-                if (isNaN(value)) return;
-                if (definition.min !== undefined && value < definition.min) value = definition.min;
-                if (definition.max !== undefined && value > definition.max) value = definition.max;
+            let value;
+            if (definition.type === 'checkbox') {
+                value = input.checked;
+            } else {
+                value = input.value;
+                if (definition.type === 'number') {
+                    value = parseFloat(value);
+                    if (isNaN(value)) return;
+                    if (definition.min !== undefined && value < definition.min) value = definition.min;
+                    if (definition.max !== undefined && value > definition.max) value = definition.max;
+                }
             }
 
             component.setProperty(definition.name, value);
