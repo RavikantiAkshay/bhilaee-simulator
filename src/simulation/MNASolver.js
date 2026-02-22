@@ -198,6 +198,10 @@ export class MNASolver {
             case 'ThreePhaseSource':
                 this.stampThreePhaseSource(component, Y, I);
                 break;
+
+            case 'Load':
+                this.stampACLoad(component, Y, omega);
+                break;
         }
     }
 
@@ -594,6 +598,9 @@ export class MNASolver {
             case 'Wattmeter':
                 this.stampWattmeter(component, G, I);
                 break;
+            case 'Load':
+                this.stampLoad(component, G);
+                break;
         }
     }
 
@@ -920,6 +927,60 @@ export class MNASolver {
             }
 
             I[rowIdx] = Vphasor;
+        }
+    }
+
+    /**
+     * Stamp Load for DC analysis.
+     * Load is series R + L. For DC, XL = 0, so stamp only R.
+     * At 0% load → open circuit (very high resistance).
+     */
+    stampLoad(component, G) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+
+        const imp = component.getLoadImpedance();
+        const R = imp ? imp.R : 1e9; // Open circuit fallback
+        const g = 1 / R;
+
+        if (n1 !== null) G.add(n1, n1, g);
+        if (n2 !== null) G.add(n2, n2, g);
+        if (n1 !== null && n2 !== null) {
+            G.add(n1, n2, -g);
+            G.add(n2, n1, -g);
+        }
+    }
+
+    /**
+     * Stamp Load for AC analysis.
+     * Z = R + jXL → Y = 1/(R + jXL) = (R - jXL) / (R² + XL²)
+     * At 0% load → open circuit (tiny admittance).
+     */
+    stampACLoad(component, Y, omega) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+
+        const imp = component.getLoadImpedance();
+
+        let y;
+        if (!imp) {
+            // Open circuit: very small admittance
+            y = new Complex(1e-12, 0);
+        } else {
+            // Y = 1/(R + jXL) = (R - jXL) / (R² + XL²)
+            const R = imp.R;
+            const XL = imp.XL;
+            const denom = R * R + XL * XL;
+            y = new Complex(R / denom, -XL / denom);
+        }
+
+        if (n1 !== null) Y.add(n1, n1, y);
+        if (n2 !== null) Y.add(n2, n2, y);
+        if (n1 !== null && n2 !== null) {
+            Y.add(n1, n2, y.neg());
+            Y.add(n2, n1, y.neg());
         }
     }
 }

@@ -245,6 +245,8 @@ export class TransientSolver {
                 this.capacitorVoltages.set(component.id, 0);
             } else if (component.constructor.name === 'Inductor') {
                 this.inductorCurrents.set(component.id, 0);
+            } else if (component.constructor.name === 'Load') {
+                this.inductorCurrents.set(component.id + '_L', 0);
             }
         }
     }
@@ -296,6 +298,9 @@ export class TransientSolver {
                 break;
             case 'Ground':
             case 'Junction':
+                break;
+            case 'Load':
+                this.stampLoad(component, G, I);
                 break;
         }
     }
@@ -439,6 +444,60 @@ export class TransientSolver {
     }
 
     /**
+     * Stamp Load component for transient analysis.
+     * Series R-L load using Backward Euler companion model:
+     *   Total companion conductance: 1 / (R + L/h)
+     *   History current source: iPrev * (L/h) / (R + L/h)
+     */
+    stampLoad(component, G, I) {
+        const [t1, t2] = component.terminals;
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+
+        const imp = component.getLoadImpedance();
+
+        if (!imp) {
+            // Open circuit: very high resistance
+            const g = 1e-12;
+            if (n1 !== null) G.add(n1, n1, g);
+            if (n2 !== null) G.add(n2, n2, g);
+            if (n1 !== null && n2 !== null) {
+                G.add(n1, n2, -g);
+                G.add(n2, n1, -g);
+            }
+            return;
+        }
+
+        const R = imp.R;
+        const f = 50; // rated frequency
+        const L = imp.XL / (2 * Math.PI * f);
+        const h = this.timeStep;
+
+        // Backward Euler series R-L:
+        // Companion resistance = R + L/h
+        // Companion conductance = 1 / (R + L/h)
+        const Rtotal = R + L / h;
+        const g = 1 / Rtotal;
+
+        // History current from inductor state
+        const iPrev = this.inductorCurrents.get(component.id + '_L') || 0;
+        // Current source = iPrev * (L/h) / (R + L/h) = iPrev * (L/h) * g
+        const iEq = iPrev * (L / h) * g;
+
+        // Stamp conductance
+        if (n1 !== null) G.add(n1, n1, g);
+        if (n2 !== null) G.add(n2, n2, g);
+        if (n1 !== null && n2 !== null) {
+            G.add(n1, n2, -g);
+            G.add(n2, n1, -g);
+        }
+
+        // Stamp history current source (flows from n1 to n2)
+        if (n1 !== null) I[n1] -= iEq;
+        if (n2 !== null) I[n2] += iEq;
+    }
+
+    /**
      * Get node index
      */
     getNodeIndex(terminal) {
@@ -473,6 +532,26 @@ export class TransientSolver {
                 // i(n) = i(n-1) + h/L * v(n)
                 const iNew = iPrev + (h / L) * (v1 - v2);
                 this.inductorCurrents.set(component.id, iNew);
+            } else if (component.constructor.name === 'Load') {
+                const imp = component.getLoadImpedance();
+                if (imp) {
+                    const [t1, t2] = component.terminals;
+                    const n1 = this.getNodeIndex(t1);
+                    const n2 = this.getNodeIndex(t2);
+                    const v1 = n1 !== null ? solution[n1] : 0;
+                    const v2 = n2 !== null ? solution[n2] : 0;
+                    const vTotal = v1 - v2;
+                    const f = 50;
+                    const L = imp.XL / (2 * Math.PI * f);
+                    const R = imp.R;
+                    const h = this.timeStep;
+                    const iPrev = this.inductorCurrents.get(component.id + '_L') || 0;
+                    // Current through series R-L: use total voltage and companion model
+                    // i(n) = i(n-1) + h/(L) * (vL) where vL = vTotal - i*R
+                    // From BE: i(n) = (h * vTotal + L * iPrev) / (L + h * R)
+                    const iNew = (h * vTotal + L * iPrev) / (L + h * R);
+                    this.inductorCurrents.set(component.id + '_L', iNew);
+                }
             }
         }
     }

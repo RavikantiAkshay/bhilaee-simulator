@@ -18,6 +18,7 @@ import { Voltmeter } from './Voltmeter.js';
 import { Transformer } from './Transformer.js';
 import { Wattmeter } from './Wattmeter.js';
 import { ThreePhaseSource } from './ThreePhaseSource.js';
+import { Load } from './Load.js';
 
 /**
  * List of all available components
@@ -34,7 +35,8 @@ export const COMPONENTS = [
     Voltmeter,
     Transformer,
     Wattmeter,
-    ThreePhaseSource
+    ThreePhaseSource,
+    Load
 ];
 
 /**
@@ -88,4 +90,4 @@ export function getComponentByShortcut(key) {
 }
 
 // Re-export component classes for convenience
-export { Resistor, Capacitor, Inductor, Ground, VoltageSource, Junction, Ammeter, Voltmeter, Transformer, Wattmeter, ThreePhaseSource };
+export { Resistor, Capacitor, Inductor, Ground, VoltageSource, Junction, Ammeter, Voltmeter, Transformer, Wattmeter, ThreePhaseSource, Load };
