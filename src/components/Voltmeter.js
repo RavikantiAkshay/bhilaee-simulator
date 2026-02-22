@@ -30,7 +30,6 @@ export class Voltmeter extends Component {
     static get icon() {
         return `
             <circle cx="16" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
-            <text x="16" y="16" text-anchor="middle" font-size="10" fill="currentColor" font-family="sans-serif">V</text>
             <line x1="0" y1="12" x2="8" y2="12" stroke="currentColor" stroke-width="2"/>
             <line x1="24" y1="12" x2="32" y2="12" stroke="currentColor" stroke-width="2"/>
         `;

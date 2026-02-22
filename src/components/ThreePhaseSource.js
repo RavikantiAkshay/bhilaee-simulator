@@ -55,7 +55,6 @@ export class ThreePhaseSource extends Component {
             <line x1="16" y1="16" x2="16" y2="6" stroke="currentColor" stroke-width="1.5"/>
             <line x1="16" y1="16" x2="8" y2="24" stroke="currentColor" stroke-width="1.5"/>
             <line x1="16" y1="16" x2="24" y2="24" stroke="currentColor" stroke-width="1.5"/>
-            <text x="16" y="28" text-anchor="middle" font-size="8" fill="currentColor">3Φ</text>
         `;
     }
 
