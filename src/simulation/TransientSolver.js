@@ -25,6 +25,7 @@ export class TransientSolver {
         // Component states (for energy storage elements)
         this.capacitorVoltages = new Map();  // capacitor ID -> voltage
         this.inductorCurrents = new Map();   // inductor ID -> current
+        this.diodeVoltages = new Map();      // diode ID -> voltage (for NR)
 
         // Results
         this.timePoints = [];
@@ -78,8 +79,11 @@ export class TransientSolver {
                 } else if (comp.constructor.name === 'Capacitor') {
                     this.capacitors.push(comp);
                     this.results.set(comp.id + '_I', []);
+                } else if (comp.constructor.name === 'Diode') {
+                    this.results.set(comp.id + '_I', []);
                 }
             }
+            this.diodes = components.filter(c => c.constructor.name === 'Diode');
 
             console.log(`=== Transient Analysis: 0 to ${endTime * 1000}ms, step=${timeStep * 1e6}µs ===`);
 
@@ -129,6 +133,19 @@ export class TransientSolver {
                     const vPrev = this.capacitorVoltages.get(c.id) || 0;
                     const current = c.properties.capacitance * (vNow - vPrev) / this.timeStep;
                     this.results.get(c.id + '_I').push(current);
+                }
+                // Calculate and store diode currents
+                if (this.diodes) {
+                    for (const d of this.diodes) {
+                        const [t1, t2] = d.terminals;
+                        const n1 = this.getNodeIndex(t1);
+                        const n2 = this.getNodeIndex(t2);
+                        const v1 = n1 !== null ? solution[n1] : 0;
+                        const v2 = n2 !== null ? solution[n2] : 0;
+                        const Vd = v1 - v2;
+                        const { Id } = d.computeDiodeModel(Vd);
+                        this.results.get(d.id + '_I').push(Id);
+                    }
                 }
 
                 // Update component states
@@ -265,41 +282,67 @@ export class TransientSolver {
                 this.inductorCurrents.set(component.id, 0);
             } else if (component.constructor.name === 'Load') {
                 this.inductorCurrents.set(component.id + '_L', 0);
+            } else if (component.constructor.name === 'Diode') {
+                this.diodeVoltages.set(component.id, 0);
             }
         }
     }
 
     /**
      * Solve for one time step
+     * Uses Newton-Raphson iteration when diodes are present.
      */
     solveTimeStep() {
         const n = this.nodes.length;
         const m = this.voltageSources.length;
         const size = n + m;
 
-        const G = new Matrix(size, size);
-        const I = new Array(size).fill(0);
+        const hasNonlinear = this.diodes && this.diodes.length > 0;
+        const maxIter = hasNonlinear ? 50 : 1;
+        const vtol = 1e-6;
 
-        const components = this.circuit.getAllComponents();
+        // Use previous time-step solution as initial guess
+        let solution = this._prevSolution || new Array(size).fill(0);
 
-        for (const component of components) {
-            this.stampComponent(component, G, I);
-        }
+        for (let iter = 0; iter < maxIter; iter++) {
+            const G = new Matrix(size, size);
+            const I = new Array(size).fill(0);
 
-        // Stamp virtual voltage sources for oscilloscope current-mode channels
-        for (const vs of this.voltageSources) {
-            if (vs._isScopeChannel) {
-                this.stampAmmeter(vs, G, I);
+            const components = this.circuit.getAllComponents();
+            for (const component of components) {
+                this.stampComponent(component, G, I, solution);
+            }
+
+            // Stamp virtual voltage sources for oscilloscope current-mode channels
+            for (const vs of this.voltageSources) {
+                if (vs._isScopeChannel) {
+                    this.stampAmmeter(vs, G, I);
+                }
+            }
+
+            const newSolution = solveLinearSystem(G, I);
+
+            if (hasNonlinear) {
+                let maxDiff = 0;
+                for (let i = 0; i < n; i++) {
+                    maxDiff = Math.max(maxDiff, Math.abs(newSolution[i] - solution[i]));
+                }
+                solution = newSolution;
+                if (maxDiff < vtol) break;
+            } else {
+                solution = newSolution;
+                break;
             }
         }
 
-        return solveLinearSystem(G, I);
+        this._prevSolution = solution;
+        return solution;
     }
 
     /**
      * Stamp component with companion model
      */
-    stampComponent(component, G, I) {
+    stampComponent(component, G, I, prevSolution = null) {
         const type = component.constructor.name;
 
         switch (type) {
@@ -329,6 +372,9 @@ export class TransientSolver {
                 break;
             case 'Oscilloscope':
                 this.stampOscilloscope(component, G);
+                break;
+            case 'Diode':
+                this.stampDiode(component, G, I, prevSolution);
                 break;
         }
     }
@@ -556,6 +602,36 @@ export class TransientSolver {
         // Stamp history current source (flows from n1 to n2)
         if (n1 !== null) I[n1] -= iEq;
         if (n2 !== null) I[n2] += iEq;
+    }
+
+    /**
+     * Stamp Diode for transient analysis (Newton-Raphson companion model).
+     * Same linearization as DC: G_D conductance + I_eq current source.
+     */
+    stampDiode(component, G, I, prevSolution = null) {
+        const [t1, t2] = component.terminals;  // anode, cathode
+        const n1 = this.getNodeIndex(t1);
+        const n2 = this.getNodeIndex(t2);
+
+        // Get voltage across diode from previous solution
+        const v1 = (prevSolution && n1 !== null) ? prevSolution[n1] : 0;
+        const v2 = (prevSolution && n2 !== null) ? prevSolution[n2] : 0;
+        const Vd = v1 - v2;
+
+        // Compute linearized model
+        const { Id, Gd, Ieq } = component.computeDiodeModel(Vd);
+
+        // Stamp conductance
+        if (n1 !== null) G.add(n1, n1, Gd);
+        if (n2 !== null) G.add(n2, n2, Gd);
+        if (n1 !== null && n2 !== null) {
+            G.add(n1, n2, -Gd);
+            G.add(n2, n1, -Gd);
+        }
+
+        // Stamp equivalent current source
+        if (n1 !== null) I[n1] -= Ieq;
+        if (n2 !== null) I[n2] += Ieq;
     }
 
     /**

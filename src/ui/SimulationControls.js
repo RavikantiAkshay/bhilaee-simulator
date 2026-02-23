@@ -457,13 +457,13 @@ export class SimulationControls {
             return;
         }
 
-        this.displayTransientResults(result);
+        this.displayTransientResults(result, solver);
     }
 
     /**
      * Display transient analysis results (text summary)
      */
-    displayTransientResults(result) {
+    displayTransientResults(result, solver = null) {
         if (!result || !this.outputContent) return;
 
         const numPoints = result.timePoints.length;
@@ -513,7 +513,7 @@ export class SimulationControls {
         this.showChart(result.timePoints, result.results);
 
         // Feed oscilloscopes (transient: time-series data)
-        this.feedOscilloscopesTransient(result);
+        this.feedOscilloscopesTransient(result, solver);
     }
 
     /**
@@ -737,7 +737,7 @@ export class SimulationControls {
      * Feed oscilloscopes for transient analysis.
      * Extracts differential voltage time-series from simulation results.
      */
-    feedOscilloscopesTransient(result) {
+    feedOscilloscopesTransient(result, solver = null) {
         const scopes = this.findOscilloscopes();
         if (scopes.length === 0) {
             this.hideScope();
@@ -771,8 +771,9 @@ export class SimulationControls {
                     label += ' (mA)';
                 } else {
                     // Voltage mode: differential voltage
-                    const posId = ch.posTerminal.id;
-                    const negId = ch.negTerminal.id;
+                    // Resolve terminal IDs to node IDs via solver for correct lookup
+                    const posId = solver ? solver.getNodeId(ch.posTerminal) : ch.posTerminal.id;
+                    const negId = solver ? solver.getNodeId(ch.negTerminal) : ch.negTerminal.id;
 
                     let posValues = null, negValues = null;
                     for (const [nodeId, vals] of result.results) {

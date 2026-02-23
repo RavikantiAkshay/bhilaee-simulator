@@ -27,6 +27,8 @@ export class MNASolver {
 
     /**
      * Run DC analysis
+     * Uses Newton-Raphson iteration for circuits containing nonlinear elements (diodes).
+     * For purely linear circuits, converges in exactly 1 iteration.
      * @returns {{ nodeVoltages: Map, branchCurrents: Map, success: boolean, error: string }}
      */
     solveDC() {
@@ -49,18 +51,78 @@ export class MNASolver {
                 };
             }
 
-            // Step 3: Build MNA matrices
-            const { G, I } = this.buildMNASystem();
+            // Step 3: Determine system size
+            const n = this.nodes.length;
+            const m = this.voltageSources.length;
+            const t = this.transformers.length;
+            const size = n + m + t;
+
+            // Check if circuit has diodes (nonlinear elements)
+            const components = this.circuit.getAllComponents();
+            this.diodes = components.filter(c => c.constructor.name === 'Diode');
+            const hasNonlinear = this.diodes.length > 0;
+
+            // Newton-Raphson settings
+            const maxIter = hasNonlinear ? 100 : 1;
+            const vtol = 1e-6;  // Voltage convergence tolerance
+
+            // Initial solution guess (all zeros)
+            let solution = new Array(size).fill(0);
+            // Give a small forward bias initial guess for diodes
+            if (hasNonlinear) {
+                for (const diode of this.diodes) {
+                    const [t1] = diode.terminals;
+                    const nIdx = this.getNodeIndex(t1);
+                    if (nIdx !== null) solution[nIdx] = 0.6;  // Typical diode forward voltage
+                }
+            }
 
             // Debug output
             console.log('=== MNA DC Analysis ===');
             console.log('Nodes:', this.nodes);
-            console.log('G matrix:');
-            G.print();
-            console.log('I vector:', I);
+            if (hasNonlinear) console.log(`Newton-Raphson: ${this.diodes.length} diode(s) detected`);
 
-            // Step 4: Solve the system
-            const solution = solveLinearSystem(G, I);
+            // Step 4: Newton-Raphson iteration
+            let converged = false;
+            let iter = 0;
+
+            for (iter = 0; iter < maxIter; iter++) {
+                // Build system with linearized nonlinear stamps
+                const { G, I } = this.buildMNASystem(solution);
+
+                if (iter === 0) {
+                    console.log('G matrix:');
+                    G.print();
+                    console.log('I vector:', I);
+                }
+
+                // Solve
+                const newSolution = solveLinearSystem(G, I);
+
+                // Check convergence for NR
+                if (hasNonlinear) {
+                    let maxDiff = 0;
+                    for (let i = 0; i < n; i++) {
+                        maxDiff = Math.max(maxDiff, Math.abs(newSolution[i] - solution[i]));
+                    }
+                    solution = newSolution;
+                    if (maxDiff < vtol) {
+                        converged = true;
+                        console.log(`NR converged in ${iter + 1} iteration(s), max ΔV = ${maxDiff.toExponential(2)}`);
+                        break;
+                    }
+                } else {
+                    solution = newSolution;
+                    converged = true;
+                    break;
+                }
+            }
+
+            if (!converged) {
+                console.warn(`NR did not converge after ${maxIter} iterations`);
+                // Still return the last solution with a warning
+            }
+
             console.log('Solution:', solution);
 
             // Step 5: Extract results
@@ -590,8 +652,9 @@ export class MNASolver {
 
     /**
      * Build MNA G matrix and I vector
+     * @param {Array|null} prevSolution - Previous solution for NR linearization of nonlinear elements
      */
-    buildMNASystem() {
+    buildMNASystem(prevSolution = null) {
         const n = this.nodes.length;
         const m = this.voltageSources.length;
         const t = this.transformers.length;  // Each transformer adds 1 row (primary current / voltage constraint)
@@ -603,7 +666,7 @@ export class MNASolver {
         const components = this.circuit.getAllComponents();
 
         for (const component of components) {
-            this.stampComponent(component, G, I);
+            this.stampComponent(component, G, I, prevSolution);
         }
 
         // Stamp virtual voltage sources for oscilloscope current-mode channels
@@ -619,7 +682,7 @@ export class MNASolver {
     /**
      * Stamp a component into the MNA matrices
      */
-    stampComponent(component, G, I) {
+    stampComponent(component, G, I, prevSolution = null) {
         const type = component.constructor.name;
 
         switch (type) {
@@ -656,6 +719,9 @@ export class MNASolver {
                 break;
             case 'Oscilloscope':
                 this.stampOscilloscope(component, G, I);
+                break;
+            case 'Diode':
+                this.stampDiode(component, G, I, prevSolution);
                 break;
         }
     }
@@ -772,6 +838,47 @@ export class MNASolver {
             }
             // Current mode is handled by stampVoltageSource (registered as virtual VS)
         }
+    }
+
+    /**
+     * Stamp Diode for DC analysis (Newton-Raphson companion model).
+     * 
+     * Linearized model at operating point V_D:
+     *   G_D = (Is / nVt) * exp(V_D / nVt)  — companion conductance
+     *   I_eq = I_D - G_D * V_D              — companion current source
+     * 
+     * Matrix stamps (anode = n1, cathode = n2):
+     *   G(n1,n1) += G_D,  G(n1,n2) -= G_D
+     *   G(n2,n1) -= G_D,  G(n2,n2) += G_D
+     *   I(n1) -= I_eq  (current out of anode)
+     *   I(n2) += I_eq  (current into cathode)
+     */
+    stampDiode(component, G, I, prevSolution = null) {
+        const [t1, t2] = component.terminals;  // anode, cathode
+        const n1 = this.getNodeIndex(t1);  // anode node
+        const n2 = this.getNodeIndex(t2);  // cathode node
+
+        // Get voltage across diode from previous solution
+        const v1 = (prevSolution && n1 !== null) ? prevSolution[n1] : 0;
+        const v2 = (prevSolution && n2 !== null) ? prevSolution[n2] : 0;
+        const Vd = v1 - v2;
+
+        // Compute linearized model
+        const { Id, Gd, Ieq } = component.computeDiodeModel(Vd);
+
+        // Stamp conductance G_D
+        if (n1 !== null) G.add(n1, n1, Gd);
+        if (n2 !== null) G.add(n2, n2, Gd);
+        if (n1 !== null && n2 !== null) {
+            G.add(n1, n2, -Gd);
+            G.add(n2, n1, -Gd);
+        }
+
+        // Stamp equivalent current source I_eq
+        // I_eq = I_D - G_D * V_D flows from anode to cathode
+        // Into RHS: subtract from anode (n1), add to cathode (n2)
+        if (n1 !== null) I[n1] -= Ieq;
+        if (n2 !== null) I[n2] += Ieq;
     }
 
     /**
