@@ -18,6 +18,9 @@ import { three_phase_connections_template }
 import { power_factor_correction_template }
     from "./power_factor_correction.js";
 
+import { transformer_test_template }
+    from "./transformer_test.js";
+
 export const circuitTemplates = {
     "basic-ee-exp-1":
         power_factor_correction_template,
@@ -31,4 +34,6 @@ export const circuitTemplates = {
         oc_sc_test_single_phase_transformer_template,
     "basic-ee-exp-6":
         three_phase_connections_template,
+    "basic-ee-exp-7":
+        transformer_test_template,
 };

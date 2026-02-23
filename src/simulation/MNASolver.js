@@ -382,12 +382,18 @@ export class MNASolver {
         const xfmrIdx = this.transformers.indexOf(component);
         const iPrimIdx = this.nodes.length + this.voltageSources.length + xfmrIdx;
 
-        // Add small leakage to ground for stability
-        const gleak = new Complex(1e-12, 0);
-        if (nPP !== null) Y.add(nPP, nPP, gleak);
-        if (nPN !== null) Y.add(nPN, nPN, gleak);
-        if (nSP !== null) Y.add(nSP, nSP, gleak);
-        if (nSN !== null) Y.add(nSN, nSN, gleak);
+        // Add small leakage to ground for stability.
+        // The secondary side is galvanically isolated (no physical ground connection),
+        // so it needs a larger virtual leakage (~1 GΩ) to act as a numerical ground
+        // reference. This prevents the isolated sub-network from creating a singular
+        // admittance matrix. The 1e-9 S value is negligible for measurement accuracy
+        // but well above the solver's 1e-12 singularity threshold.
+        const gleakPri = new Complex(1e-12, 0);
+        const gleakSec = new Complex(1e-9, 0);  // larger for isolated secondary
+        if (nPP !== null) Y.add(nPP, nPP, gleakPri);
+        if (nPN !== null) Y.add(nPN, nPN, gleakPri);
+        if (nSP !== null) Y.add(nSP, nSP, gleakSec);
+        if (nSN !== null) Y.add(nSN, nSN, gleakSec);
 
         // 1. Stamp Zeq = Req + jXeq between P+ and n_mid
         //    Admittance Yeq = 1 / (Req + jXeq)
@@ -415,29 +421,39 @@ export class MNASolver {
             Y.add(nPN, nMid, Ysh.neg());
         }
 
-        // 3. Stamp ideal transformer constraint (same structure as DC, but complex)
+        // 3. Stamp ideal transformer constraint (symmetric MNA formulation)
+        //
+        // Auxiliary variable x = I_primary (current entering n_mid from the ideal xfmr)
+        //
+        // Voltage constraint row:
+        //   V(n_mid) - V(P-) - a*V(S+) + a*V(S-) = 0
+        //
+        // KCL column stamps (SYMMETRIC with row for numerical stability):
+        //   n_mid: +x,  P-: -x,  S+: -a*x,  S-: +a*x
+        //
+        // Power conservation: V1*I1 = V2*I2 is maintained because
+        //   I_secondary = -a * x  and  V_secondary = V_primary / a
+        //   → V2 * I2 = (V1/a) * (a*x) = V1*x = V1*I1  ✓
+        //
         const one = Complex.one();
         const negOne = one.neg();
         const ca = Complex.fromReal(a);
-        const cInvA = Complex.fromReal(1 / a);
 
-        // Voltage constraint row:
-        // V(n_mid) - V(P-) - a*V(S+) + a*V(S-) = 0
         if (nMid !== null) {
-            Y.add(iPrimIdx, nMid, one);
-            Y.add(nMid, iPrimIdx, one);    // KCL: I_p enters n_mid
+            Y.add(iPrimIdx, nMid, one);       // Row: +1 at V(n_mid)
+            Y.add(nMid, iPrimIdx, one);        // Col: +x at KCL(n_mid)
         }
         if (nPN !== null) {
-            Y.add(iPrimIdx, nPN, negOne);
-            Y.add(nPN, iPrimIdx, negOne);  // KCL: I_p leaves P-
+            Y.add(iPrimIdx, nPN, negOne);      // Row: -1 at V(P-)
+            Y.add(nPN, iPrimIdx, negOne);      // Col: -x at KCL(P-)
         }
         if (nSP !== null) {
-            Y.add(iPrimIdx, nSP, ca.neg());
-            Y.add(nSP, iPrimIdx, cInvA);   // KCL: I_p/a enters S+
+            Y.add(iPrimIdx, nSP, ca.neg());    // Row: -a at V(S+)
+            Y.add(nSP, iPrimIdx, ca.neg());    // Col: -a*x at KCL(S+)  [symmetric]
         }
         if (nSN !== null) {
-            Y.add(iPrimIdx, nSN, ca);
-            Y.add(nSN, iPrimIdx, cInvA.neg()); // KCL: I_p/a leaves S-
+            Y.add(iPrimIdx, nSN, ca);          // Row: +a at V(S-)
+            Y.add(nSN, iPrimIdx, ca);          // Col: +a*x at KCL(S-)  [symmetric]
         }
 
         I[iPrimIdx] = Complex.zero();

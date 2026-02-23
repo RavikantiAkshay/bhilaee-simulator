@@ -64,7 +64,7 @@ function init() {
 
     // Get experiment ID from URL
     const urlParams = new URLSearchParams(window.location.search);
-    const expId = urlParams.get('expId') || 'sandbox'; // Default if not provided
+    const expId = urlParams.get('expId') || urlParams.get('exp') || 'sandbox'; // Default if not provided
     console.log(`🔌 Initializing session for experiment: ${expId}`);
 
     const stateManager = new StateManager(expId);
