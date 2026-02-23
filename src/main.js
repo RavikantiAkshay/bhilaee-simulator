@@ -10,6 +10,7 @@ import { PropertyPanel } from './ui/PropertyPanel.js';
 import { SimulationControls } from './ui/SimulationControls.js';
 import { StateManager } from './utils/StateManager.js';
 import { testMatrixSolver, MNASolver } from './simulation/index.js';
+import { circuitTemplates } from './templates/index.js';
 
 // Global instances
 let circuitGraph;
@@ -51,6 +52,12 @@ function init() {
         simulationControls = new SimulationControls(simulationPanelElement, circuitGraph);
     }
 
+    // Expose globals for dynamic reloading logic in presets
+    window.circuitGraph = circuitGraph;
+    window.canvas = canvas;
+    window.propertyPanel = propertyPanel;
+    window.simulationControls = simulationControls;
+
     // Setup header buttons
     setupHeaderButtons();
 
@@ -71,7 +78,10 @@ function init() {
 
     // Load previous state if available
     const savedState = stateManager.loadState();
-    if (savedState && savedState.circuit) {
+    if (savedState && savedState.requirePresetSelection) {
+        // Multi-preset experiment, user needs to select which one
+        showPresetSelectionModal(savedState.presets, savedState.expId);
+    } else if (savedState && savedState.circuit) {
         console.log('Restoring saved simulation state...');
         circuitGraph.deserialize(savedState.circuit);
 
@@ -79,9 +89,26 @@ function init() {
         if (canvas) {
             canvas.renderAll();
         }
+
+        // Show "Change Config" button if this template actually supports multiple presets
+        // (Moved unifying logic outside the if/else block below)
     } else {
         // Initial save for new session
         stateManager.saveState(circuitGraph);
+    }
+
+    // Unify "Change Config" button display logic
+    // This ensures it appears on page reload, regardless of whether state came from localStorage or URL initialization
+    const expIdToUse = (savedState && savedState.expId) ? savedState.expId : expId;
+    const template = circuitTemplates[expIdToUse] || null;
+    if (template && template.presets && template.presets.length > 1) {
+        const btnChangeConfig = document.getElementById('btn-change-config');
+        if (btnChangeConfig) {
+            btnChangeConfig.style.display = 'inline-flex';
+            btnChangeConfig.onclick = () => {
+                showPresetSelectionModal(template.presets, expIdToUse);
+            };
+        }
     }
 
     // Listen for circuit changes (topology)
@@ -138,6 +165,119 @@ function setupHeaderButtons() {
         loadCircuit();
     });
 }
+
+/**
+ * Shows the preset selection modal
+ */
+function showPresetSelectionModal(presets, expId) {
+    const overlay = document.getElementById('preset-modal-overlay');
+    const grid = document.getElementById('preset-grid');
+    if (!overlay || !grid) return;
+
+    // Clear existing
+    grid.innerHTML = '';
+
+    presets.forEach(preset => {
+        const card = document.createElement('div');
+        card.className = 'preset-card';
+        card.innerHTML = `
+            <h3>${preset.name}</h3>
+            <p>${preset.description || ''}</p>
+        `;
+        card.onclick = () => {
+            window.loadPreset(preset.presetId, expId);
+            overlay.style.display = 'none';
+        };
+        grid.appendChild(card);
+    });
+
+    overlay.style.display = 'flex';
+}
+
+/**
+ * Deep reset and load a specific preset without page reload
+ */
+window.loadPreset = function (presetId, currentExpId) {
+    console.log(`Loading preset: ${presetId}`);
+
+    // Update URL without reload
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('preset', presetId);
+    if (currentExpId) urlParams.set('expId', currentExpId);
+
+    const newUrl = window.location.pathname + '?' + urlParams.toString();
+    window.history.replaceState({}, '', newUrl);
+
+    // Deep reset of simulation controls and buffers
+    if (window.simulationControls) {
+        // Make sure any running simulation is stopped
+        if (window.simulationControls.running) {
+            window.simulationControls.toggleSimulation();
+        }
+        window.simulationControls.hideScope();
+        window.simulationControls.chart?.destroy();
+        window.simulationControls.chart = null;
+        document.getElementById('chart-container').style.display = 'none';
+        document.getElementById('output-content').innerHTML = '';
+        document.getElementById('output-panel').classList.add('collapsed');
+    }
+
+    // Reset circuit graph
+    if (window.circuitGraph) {
+        window.circuitGraph.clear();
+    }
+
+    if (window.canvas) {
+        window.canvas.clear();
+    }
+
+    // Clear property panel
+    if (window.propertyPanel) {
+        window.propertyPanel.showEmpty();
+    }
+
+    // Reload state which will now pick up the preset from the URL
+    // Need to use the global stateManager if available or create a new one
+    const sm = window.circuitSimulator.stateManager || new window.StateManager(currentExpId);
+
+    // Force reset local storage for this session so we start clean from the preset
+    localStorage.removeItem(sm.storageKey);
+
+    const newState = sm.loadState();
+
+    if (newState && newState.circuit) {
+        window.circuitGraph.deserialize(newState.circuit);
+
+        // Force SVG recalculations
+        for (const component of window.circuitGraph.components.values()) {
+            component.updateElement();
+        }
+
+        if (window.canvas) {
+            // Slight delay allows DOM to clear nodes before re-appending
+            setTimeout(() => {
+                window.canvas.renderAll();
+                console.log("Canvas re-rendered with new preset.");
+            }, 50);
+        }
+
+        // Ensure "Change Config" button is visible
+        const template = circuitTemplates[currentExpId] || null;
+        if (template && template.presets && template.presets.length > 1) {
+            const btnChangeConfig = document.getElementById('btn-change-config');
+            if (btnChangeConfig) {
+                btnChangeConfig.style.display = 'inline-flex';
+                btnChangeConfig.onclick = () => {
+                    showPresetSelectionModal(template.presets, currentExpId);
+                };
+            }
+        }
+
+    }
+
+    // Auto-open Property panel by default when preset is selected
+    document.getElementById('property-panel').classList.remove('collapsed');
+};
 
 /**
  * Setup collapsible sections in the right panel

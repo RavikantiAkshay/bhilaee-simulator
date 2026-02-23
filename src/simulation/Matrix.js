@@ -18,7 +18,7 @@ export class Matrix {
         this.rows = rows;
         this.cols = cols;
         this.data = [];
-        
+
         for (let i = 0; i < rows; i++) {
             this.data[i] = [];
             for (let j = 0; j < cols; j++) {
@@ -113,7 +113,7 @@ export class Matrix {
  */
 export function solveLinearSystem(A, b) {
     const n = A.rows;
-    
+
     // Create augmented matrix [A|b]
     const aug = new Matrix(n, n + 1);
     for (let i = 0; i < n; i++) {
@@ -145,7 +145,7 @@ export function solveLinearSystem(A, b) {
         }
 
         // Check for singular matrix
-        if (Math.abs(aug.get(k, k)) < 1e-12) {
+        if (Math.abs(aug.get(k, k)) < 1e-14) {
             throw new Error(`Singular matrix at row ${k}. Circuit may have floating nodes or short circuits.`);
         }
 
@@ -177,7 +177,7 @@ export function solveLinearSystem(A, b) {
  */
 export function testMatrixSolver() {
     console.log('=== Matrix Solver Test ===');
-    
+
     // Test: solve 2x + y = 5, x + 3y = 6
     // Solution: x = 1.8, y = 1.4
     const A = Matrix.fromArray([
@@ -185,19 +185,19 @@ export function testMatrixSolver() {
         [1, 3]
     ]);
     const b = [5, 6];
-    
+
     const x = solveLinearSystem(A, b);
     console.log('System: 2x + y = 5, x + 3y = 6');
     console.log('Solution:', x.map(v => v.toFixed(4)));
     console.log('Expected: [1.8000, 1.4000]');
-    
+
     // Verify
     const v1 = 2 * x[0] + x[1];
     const v2 = x[0] + 3 * x[1];
     console.log('Verification: 2x + y =', v1.toFixed(4), ', x + 3y =', v2.toFixed(4));
-    
+
     const success = Math.abs(v1 - 5) < 0.0001 && Math.abs(v2 - 6) < 0.0001;
     console.log('Test:', success ? '✓ PASSED' : '✗ FAILED');
-    
+
     return success;
 }

@@ -21,6 +21,9 @@ import { power_factor_correction_template }
 import { transformer_test_template }
     from "./transformer_test.js";
 
+import { diode_rectifiers_template }
+    from "./diode_rectifiers.js";
+
 export const circuitTemplates = {
     "basic-ee-exp-1":
         power_factor_correction_template,
@@ -36,4 +39,6 @@ export const circuitTemplates = {
         three_phase_connections_template,
     "basic-ee-exp-7":
         transformer_test_template,
+    "devices_and_circuits-exp3":
+        diode_rectifiers_template
 };

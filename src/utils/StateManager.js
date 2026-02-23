@@ -60,19 +60,44 @@ export class StateManager {
             const template = circuitTemplates[this.expId];
             if (template) {
                 console.log(`StateManager: Initializing from template for ${this.expId}`);
-                // Deep clone template to avoid mutation
+
+                const presetId = urlParams.get('preset');
+                let circuitDataToLoad = null;
+
+                // Handle preset routing logic
+                if (template.presets && template.presets.length > 0) {
+                    if (presetId) {
+                        // User specified a preset in URL
+                        const selectedPreset = template.presets.find(p => p.presetId === presetId);
+                        if (selectedPreset) {
+                            circuitDataToLoad = selectedPreset.circuit;
+                        } else {
+                            console.warn(`StateManager: Preset '${presetId}' not found, falling back to default.`);
+                        }
+                    }
+
+                    // If no valid preset is selected yet
+                    if (!circuitDataToLoad) {
+                        if (template.presets.length > 1) {
+                            // Multiple presets available -> Trigger UI Selection
+                            return { requirePresetSelection: true, presets: template.presets, expId: this.expId };
+                        } else {
+                            // Only one preset -> Auto-load it
+                            circuitDataToLoad = template.presets[0].circuit;
+                        }
+                    }
+                }
+
+                // If no presets array or if we fallback, the template itself IS the circuit data.
+                if (!circuitDataToLoad) {
+                    circuitDataToLoad = template;
+                }
+
+                // Deep clone template/preset to avoid mutation
                 const initialState = {
                     expId: this.expId,
                     timestamp: Date.now(),
-                    // Template structure might differ from serialized circuit, 
-                    // dependent on how user provides "connections".
-                    // For now, we assume template follows a structure we can parse or use.
-                    // Actually, the user's template has 'components' and 'connections'.
-                    // Our serialize() returns { components: [...], wires: [...] }.
-                    // We might need a flexible adapter here, but user said "Structure of sim_states: { ...stateObject... }"
-                    // which implies the template *is* the state object or close to it.
-                    // Let's wrap it in the expected state structure.
-                    circuit: JSON.parse(JSON.stringify(template))
+                    circuit: JSON.parse(JSON.stringify(circuitDataToLoad))
                 };
 
                 // Return immediately without saving to localStorage

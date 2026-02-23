@@ -37,6 +37,15 @@
                     </svg>
                     Back to Guide
                 </a>
+                <button class="btn btn-secondary" id="btn-change-config" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="8" y1="13" x2="16" y2="13" />
+                        <line x1="8" y1="17" x2="16" y2="17" />
+                    </svg>
+                    Change Config
+                </button>
                 <button class="btn btn-secondary" id="btn-new">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -75,6 +84,16 @@
 
         <!-- Main Content -->
         <main class="app-main">
+            <!-- Preset Selection Modal Overlay (Hidden by default) -->
+            <div id="preset-modal-overlay" class="preset-modal-overlay" style="display: none;">
+                <div class="preset-modal">
+                    <h2 class="preset-modal-title">Select Circuit Configuration</h2>
+                    <p class="preset-modal-desc">This experiment has multiple variants. Select one to continue.</p>
+                    <div id="preset-grid" class="preset-grid">
+                        <!-- Preset cards injected here via JS -->
+                    </div>
+                </div>
+            </div>
             <!-- Toolbar (Component Palette) -->
             <aside class="toolbar" id="toolbar">
                 <h2 class="toolbar-title">Components</h2>
