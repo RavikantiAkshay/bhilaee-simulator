@@ -875,7 +875,7 @@ body {
     position: absolute;
     top: 20px;
     left: 20px;
-    right: 20px;
+    width: calc(100% - 40px);
     height: 300px;
     background: var(--bg-secondary);
     border: 1px solid var(--accent-primary);
@@ -883,6 +883,7 @@ body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(88, 166, 255, 0.1);
     overflow: hidden;
     z-index: 101;
+    resize: both;
 }
 
 .scope-overlay.visible {
@@ -893,6 +894,12 @@ body {
 .scope-overlay .chart-header {
     background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-elevated));
     border-bottom: 1px solid var(--accent-primary);
+    cursor: grab;
+    user-select: none;
+}
+
+.scope-overlay .chart-header:active {
+    cursor: grabbing;
 }
 
 .scope-overlay .chart-title {

@@ -40,6 +40,9 @@ export class SimulationControls {
         this.scopeClose = document.getElementById('scope-close');
         this.scopeChart = null;
 
+        // Setup scope drag-to-move
+        this._setupScopeDrag();
+
         // State
         this.running = false;
 
@@ -827,6 +830,57 @@ export class SimulationControls {
         if (this.scopeOverlay) {
             this.scopeOverlay.classList.remove('visible');
         }
+    }
+
+    /**
+     * Setup drag-to-move for the oscilloscope overlay
+     */
+    _setupScopeDrag() {
+        if (!this.scopeOverlay) return;
+
+        const header = this.scopeOverlay.querySelector('.chart-header');
+        if (!header) return;
+
+        let isDragging = false;
+        let startX, startY;
+        let initialLeft, initialTop;
+
+        const onMouseDown = (e) => {
+            // Only drag on left click and if not clicking the close button
+            if (e.button !== 0 || e.target.closest('.chart-close')) return;
+
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            // Get current CSS properties
+            const style = window.getComputedStyle(this.scopeOverlay);
+            initialLeft = parseInt(style.left, 10) || 0;
+            initialTop = parseInt(style.top, 10) || 0;
+
+            // Prevent text selection during drag
+            document.body.style.userSelect = 'none';
+        };
+
+        const onMouseMove = (e) => {
+            if (!isDragging) return;
+
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            this.scopeOverlay.style.left = `${initialLeft + dx}px`;
+            this.scopeOverlay.style.top = `${initialTop + dy}px`;
+        };
+
+        const onMouseUp = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            document.body.style.userSelect = '';
+        };
+
+        header.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
     }
 
     /**
