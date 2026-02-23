@@ -128,7 +128,12 @@ function setupHeaderButtons() {
         saveCircuit();
     });
 
-    // Load circuit
+    // Download circuit state as JSON file
+    document.getElementById('btn-download')?.addEventListener('click', () => {
+        downloadCircuit();
+    });
+
+    // Load circuit from JSON file
     document.getElementById('btn-load')?.addEventListener('click', () => {
         loadCircuit();
     });
@@ -176,7 +181,49 @@ function saveCircuit() {
 }
 
 /**
- * Load circuit from file
+ * Download current circuit state as a JSON file.
+ * This does NOT affect localStorage or templates.
+ */
+function downloadCircuit() {
+    try {
+        const data = circuitGraph.serialize();
+        const state = {
+            expId: window.circuitSimulator.stateManager?.expId || 'sandbox',
+            timestamp: Date.now(),
+            circuit: data
+        };
+
+        const json = JSON.stringify(state, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `circuit_${state.expId}_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Visual feedback
+        const btn = document.getElementById('btn-download');
+        if (btn) {
+            const original = btn.innerHTML;
+            btn.textContent = '✓ Downloaded';
+            setTimeout(() => { btn.innerHTML = original; }, 1000);
+        }
+
+        console.log('Circuit downloaded as JSON.');
+    } catch (error) {
+        console.error('Failed to download circuit:', error);
+        alert('Failed to download circuit state.');
+    }
+}
+
+/**
+ * Load circuit from a JSON file.
+ * Deserializes onto the canvas for immediate viewing.
+ * Does NOT save to localStorage — the user must click Save explicitly.
  */
 function loadCircuit() {
     const input = document.createElement('input');
@@ -191,12 +238,31 @@ function loadCircuit() {
         reader.onload = (event) => {
             try {
                 const data = JSON.parse(event.target.result);
-                // TODO: Deserialize and rebuild circuit
-                console.log('Loaded circuit data:', data);
-                alert('Circuit loading not fully implemented yet');
+
+                // Accept either { circuit: { components, wires } } or { components, wires } directly
+                const circuitData = data.circuit || data;
+
+                if (!circuitData.components) {
+                    throw new Error('Invalid circuit file: missing components array');
+                }
+
+                // Clear existing circuit and load new state
+                canvas.clear();
+                circuitGraph.deserialize(circuitData);
+                canvas.renderAll();
+
+                // Visual feedback
+                const btn = document.getElementById('btn-load');
+                if (btn) {
+                    const original = btn.innerHTML;
+                    btn.textContent = '✓ Loaded';
+                    setTimeout(() => { btn.innerHTML = original; }, 1000);
+                }
+
+                console.log(`Circuit loaded from file: ${file.name} (not saved to localStorage)`);
             } catch (error) {
                 console.error('Failed to load circuit:', error);
-                alert('Failed to load circuit: Invalid file');
+                alert(`Failed to load circuit: ${error.message}`);
             }
         };
         reader.readAsText(file);
