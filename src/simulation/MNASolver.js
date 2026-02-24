@@ -151,6 +151,107 @@ export class MNASolver {
     }
 
     /**
+     * Stamp non-ideal OpAmp for DC analysis
+     */
+    stampOpAmp(component, G, I) {
+        const props = component.properties;
+        const A0 = props.openLoopGain;
+        const rout = Math.max(0.001, props.rout);
+        const rin = props.rin;
+        const ric = props.rin * 50;
+        const cmrr_linear = Math.pow(10, props.cmrr / 20);
+        const Ac = A0 / cmrr_linear;
+
+        const g_plus = A0 + Ac / 2;
+        const g_minus = -A0 + Ac / 2;
+        const g_out = 1 / rout;
+        const G_id = 1 / rin;
+        const G_ic = 1 / ric;
+
+        const nPos = this.getNodeIndex(component.terminals[0]);
+        const nNeg = this.getNodeIndex(component.terminals[1]);
+        const nOut = this.getNodeIndex(component.terminals[2]);
+        const nPole = this.getNodeIndex(component.terminals[3]);
+
+        // Input resistors
+        if (nPos !== null) G.add(nPos, nPos, G_id + G_ic);
+        if (nNeg !== null) G.add(nNeg, nNeg, G_id + G_ic);
+        if (nPos !== null && nNeg !== null) {
+            G.add(nPos, nNeg, -G_id);
+            G.add(nNeg, nPos, -G_id);
+        }
+
+        // Internal pole node (VCVS generating dominant voltage)
+        if (nPole !== null) {
+            G.add(nPole, nPole, 1.0);
+            if (nPos !== null) G.add(nPole, nPos, -g_plus);
+            if (nNeg !== null) G.add(nPole, nNeg, -g_minus);
+            if (props.offsetVoltage !== 0) {
+                I[nPole] += A0 * props.offsetVoltage;
+            }
+        }
+
+        // Output stage (dependent source buffer + Rout)
+        if (nOut !== null) {
+            G.add(nOut, nOut, g_out);
+            if (nPole !== null) G.add(nOut, nPole, -g_out);
+        }
+    }
+
+    /**
+     * Stamp non-ideal OpAmp for AC analysis
+     */
+    stampACOpAmp(component, Y, I, omega) {
+        const props = component.properties;
+        const A0 = props.openLoopGain;
+        const rout = Math.max(0.001, props.rout);
+        const rin = props.rin;
+        const ric = props.rin * 50;
+        const cmrr_linear = Math.pow(10, props.cmrr / 20);
+        const Ac = A0 / cmrr_linear;
+
+        const g_plus = Complex.fromReal(A0 + Ac / 2);
+        const g_minus = Complex.fromReal(-A0 + Ac / 2);
+        const g_out = Complex.fromReal(1 / rout);
+        const G_id = Complex.fromReal(1 / rin);
+        const G_ic = Complex.fromReal(1 / ric);
+
+        const nPos = this.getNodeIndex(component.terminals[0]);
+        const nNeg = this.getNodeIndex(component.terminals[1]);
+        const nOut = this.getNodeIndex(component.terminals[2]);
+        const nPole = this.getNodeIndex(component.terminals[3]);
+
+        if (nPos !== null) Y.add(nPos, nPos, G_id.add(G_ic));
+        if (nNeg !== null) Y.add(nNeg, nNeg, G_id.add(G_ic));
+        if (nPos !== null && nNeg !== null) {
+            Y.add(nPos, nNeg, G_id.neg());
+            Y.add(nNeg, nPos, G_id.neg());
+        }
+
+        if (nPole !== null) {
+            const fp = props.gbp / A0;
+            const Cp = 1 / (2 * Math.PI * fp);
+            const Ymag = omega * Cp;
+            // Pole admittance = 1.0 + j * omega * Cp
+            const yPole = new Complex(1.0, Ymag);
+            Y.add(nPole, nPole, yPole);
+
+            if (nPos !== null) Y.add(nPole, nPos, g_plus.neg());
+            if (nNeg !== null) Y.add(nPole, nNeg, g_minus.neg());
+
+            if (props.offsetVoltage !== 0) {
+                const I_os = Complex.fromReal(A0 * props.offsetVoltage);
+                // I vector requires assigning complex directly, not null check
+                I[nPole] = I[nPole] ? I[nPole].add(I_os) : I_os;
+            }
+        }
+
+        if (nOut !== null) {
+            Y.add(nOut, nOut, g_out);
+            if (nPole !== null) Y.add(nOut, nPole, g_out.neg());
+        }
+    }
+    /**
      * Run AC analysis at a given frequency
      * @param {number} frequency - Frequency in Hz
      * @returns {{ nodeVoltages: Map, branchCurrents: Map, success: boolean, error: string }}
@@ -268,6 +369,12 @@ export class MNASolver {
                 this.stampThreePhaseSource(component, Y, I);
                 break;
 
+            case 'Diode':
+                this.stampACDiode(component, Y, omega);
+                break;
+            case 'OpAmp':
+                this.stampACOpAmp(component, Y, I, omega);
+                break;
             case 'Load':
                 this.stampACLoad(component, Y, omega);
                 break;
@@ -722,6 +829,9 @@ export class MNASolver {
                 break;
             case 'Diode':
                 this.stampDiode(component, G, I, prevSolution);
+                break;
+            case 'OpAmp':
+                this.stampOpAmp(component, G, I);
                 break;
         }
     }

@@ -307,6 +307,7 @@ export class CircuitGraph {
         for (const component of this.components.values()) {
             for (const terminal of component.terminals) {
                 if (!terminal.isConnected() && component.type !== 'ground' && component.type !== 'transformer' && component.type !== 'oscilloscope') {
+                    if (terminal.isHidden) continue;
                     errors.push(`${component.getLabel()} has unconnected terminal: ${terminal.name}`);
                 }
             }

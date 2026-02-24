@@ -322,6 +322,13 @@ export class TransientSolver {
 
             const newSolution = solveLinearSystem(G, I);
 
+            if (this.timePoints.length === 1 && iter === 0) {
+                console.log(`--- Integrator Debug [t=${this.time}] ---`);
+                G.print('Transient G Matrix:');
+                console.log('Transient I Vector:', I);
+                console.log('Solution V:', newSolution);
+            }
+
             if (hasNonlinear) {
                 let maxDiff = 0;
                 for (let i = 0; i < n; i++) {
@@ -375,6 +382,9 @@ export class TransientSolver {
                 break;
             case 'Diode':
                 this.stampDiode(component, G, I, prevSolution);
+                break;
+            case 'OpAmp':
+                this.stampOpAmp(component, G, I);
                 break;
         }
     }
@@ -635,6 +645,76 @@ export class TransientSolver {
     }
 
     /**
+     * Stamp non-ideal OpAmp for transient analysis
+     */
+    stampOpAmp(component, G, I) {
+        const props = component.properties;
+        const A0 = props.openLoopGain;
+        const rout = Math.max(0.001, props.rout);
+        const rin = props.rin;
+        const ric = props.rin * 50;
+        const cmrr_linear = Math.pow(10, props.cmrr / 20);
+        const Ac = A0 / cmrr_linear;
+
+        const g_plus = A0 + Ac / 2;
+        const g_minus = -A0 + Ac / 2;
+        const g_out = 1 / rout;
+        const G_id = 1 / rin;
+        const G_ic = 1 / ric;
+
+        const nPos = this.getNodeIndex(component.terminals[0]);
+        const nNeg = this.getNodeIndex(component.terminals[1]);
+        const nOut = this.getNodeIndex(component.terminals[2]);
+        const nPole = this.getNodeIndex(component.terminals[3]);
+
+        // Input resistors
+        if (nPos !== null) G.add(nPos, nPos, G_id + G_ic);
+        if (nNeg !== null) G.add(nNeg, nNeg, G_id + G_ic);
+        if (nPos !== null && nNeg !== null) {
+            G.add(nPos, nNeg, -G_id);
+            G.add(nNeg, nPos, -G_id);
+        }
+
+        // Internal pole node (Dominant Pole Filter)
+        if (nPole !== null) {
+            // We model Vpole with a single pole low-pass filter:
+            // d(Vpole)/dt = (A0 * Vdiff - Vpole) / (Rp * Cp)
+            // Using Backward Euler: Vpole_n = Vpole_{n-1} + (h / (Rp*Cp)) * (A0*Vdiff_n - Vpole_n)
+            // Rearranging: Vpole_n * (1 + h/(Rp*Cp)) - (h * A0 / (Rp*Cp)) * Vdiff_n = Vpole_{n-1}
+            //
+            // We can map this equation directly into the MNA row for nPole since it's an isolated node.
+            // Let tau = Rp * Cp. (Since we normalized Rp=1, tau = Cp = 1/(2*PI*fp))
+            const fp = props.gbp / A0;
+            const tau = 1 / (2 * Math.PI * fp);
+            const h = this.timeStep;
+
+            const alpha = h / tau; // (h / Rp*Cp)
+
+            // Equation: Vpole * (1 + alpha) - Vpos * (alpha * g_plus) - Vneg * (alpha * g_minus) = Vpole_prev
+            const G_pole_diag = 1 + alpha;
+            const vPrevPole = this.capacitorVoltages.get('__pole_' + component.id) || 0;
+
+            G.add(nPole, nPole, G_pole_diag);
+            I[nPole] += vPrevPole; // Previous state forms the RHS
+
+            // Add differential dependencies (Vdiff)
+            if (nPos !== null) G.add(nPole, nPos, -alpha * g_plus);
+            if (nNeg !== null) G.add(nPole, nNeg, -alpha * g_minus);
+
+            // Offset voltage
+            if (props.offsetVoltage !== 0) {
+                I[nPole] += alpha * A0 * props.offsetVoltage;
+            }
+        }
+
+        // Output stage
+        if (nOut !== null) {
+            G.add(nOut, nOut, g_out);
+            if (nPole !== null) G.add(nOut, nPole, -g_out);
+        }
+    }
+
+    /**
      * Get node index
      */
     getNodeIndex(terminal) {
@@ -689,6 +769,10 @@ export class TransientSolver {
                     const iNew = (h * vTotal + L * iPrev) / (L + h * R);
                     this.inductorCurrents.set(component.id + '_L', iNew);
                 }
+            } else if (component.constructor.name === 'OpAmp') {
+                const nPole = this.getNodeIndex(component.terminals[3]);
+                const vPole = nPole !== null ? solution[nPole] : 0;
+                this.capacitorVoltages.set('__pole_' + component.id, vPole);
             }
         }
     }

@@ -21,6 +21,7 @@ import { ThreePhaseSource } from './ThreePhaseSource.js';
 import { Load } from './Load.js';
 import { Oscilloscope } from './Oscilloscope.js';
 import { Diode } from './Diode.js';
+import { OpAmp } from './OpAmp.js';
 
 /**
  * List of all available components
@@ -40,7 +41,8 @@ export const COMPONENTS = [
     ThreePhaseSource,
     Load,
     Oscilloscope,
-    Diode
+    Diode,
+    OpAmp
 ];
 
 /**
