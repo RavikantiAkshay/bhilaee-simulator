@@ -1,3 +1,3 @@
 const CONFIG = {
-    GUIDE_URL: "http://localhost:3000"
+    GUIDE_URL: "https://bhilaee-labs.vercel.app"
 };
