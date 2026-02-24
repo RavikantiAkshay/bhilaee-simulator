@@ -86,6 +86,34 @@ export const diode_rectifiers_template = {
                     { "id": "wire_73", "startTerminal": "comp_15_anode", "endTerminal": "comp_4_node", "points": [{ "x": 300, "y": 370 }, { "x": 300, "y": 370 }, { "x": 300, "y": 320 }, { "x": 300, "y": 320 }] }
                 ]
             }
+        },
+        {
+            presetId: "clipper",
+            name: "Clipper Circuit",
+            description: "Diode clipping circuit that limits parts of an AC waveform.",
+            circuit: {
+                components: [
+                    { "id": "comp_1", "type": "voltage_source", "x": 300, "y": 320, "rotation": 0, "properties": { "voltage": 10, "type": "ac", "frequency": 50, "phase": 0 }, "state": {} },
+                    { "id": "comp_2", "type": "resistor", "x": 360, "y": 220, "rotation": 0, "properties": { "resistance": 1000 }, "state": {} },
+                    { "id": "comp_3", "type": "voltage_source", "x": 460, "y": 360, "rotation": 0, "properties": { "voltage": 1.5, "type": "dc", "frequency": 50, "phase": 0 }, "state": {} },
+                    { "id": "comp_4", "type": "diode", "x": 460, "y": 280, "rotation": 90, "properties": { "saturationCurrent": 1e-14, "emissionCoefficient": 1, "thermalVoltage": 0.02585 } },
+                    { "id": "comp_5", "type": "ground", "x": 360, "y": 440, "rotation": 0, "properties": {}, "state": {} },
+                    { "id": "comp_6", "type": "oscilloscope", "x": 600, "y": 320, "rotation": 0, "properties": { "ch1Enabled": true, "ch2Enabled": false, "ch1Mode": "Voltage", "ch2Mode": "Voltage", "ch1Label": "CH1", "ch2Label": "CH2" }, "state": {} },
+                    { "id": "comp_7", "type": "junction", "x": 460, "y": 220, "rotation": 90, "properties": {}, "state": {} },
+                    { "id": "comp_8", "type": "junction", "x": 460, "y": 420, "rotation": 0, "properties": {}, "state": {} }
+                ],
+                wires: [
+                    { "id": "wire_3", "startTerminal": "comp_1_positive", "endTerminal": "comp_2_left", "points": [{ "x": 300, "y": 290 }, { "x": 300, "y": 290 }, { "x": 300, "y": 220 }, { "x": 330, "y": 220 }] },
+                    { "id": "wire_5", "startTerminal": "comp_2_right", "endTerminal": "comp_7_node", "points": [{ "x": 390, "y": 220 }, { "x": 425, "y": 220 }, { "x": 425, "y": 220 }, { "x": 460, "y": 220 }] },
+                    { "id": "wire_7", "startTerminal": "comp_7_node", "endTerminal": "comp_6_ch1_pos", "points": [{ "x": 460, "y": 220 }, { "x": 600, "y": 220 }, { "x": 600, "y": 285 }, { "x": 600, "y": 285 }] },
+                    { "id": "wire_9", "startTerminal": "comp_7_node", "endTerminal": "comp_4_anode", "points": [{ "x": 460, "y": 220 }, { "x": 460, "y": 220 }, { "x": 460, "y": 250 }, { "x": 460, "y": 250 }] },
+                    { "id": "wire_11", "startTerminal": "comp_3_positive", "endTerminal": "comp_4_cathode", "points": [{ "x": 460, "y": 330 }, { "x": 460, "y": 330 }, { "x": 460, "y": 310 }, { "x": 460, "y": 310 }] },
+                    { "id": "wire_13", "startTerminal": "comp_1_negative", "endTerminal": "comp_5_ref", "points": [{ "x": 300, "y": 350 }, { "x": 300, "y": 350 }, { "x": 300, "y": 425 }, { "x": 360, "y": 425 }] },
+                    { "id": "wire_16", "startTerminal": "comp_8_node", "endTerminal": "comp_5_ref", "points": [{ "x": 460, "y": 420 }, { "x": 460, "y": 420 }, { "x": 460, "y": 425 }, { "x": 360, "y": 425 }] },
+                    { "id": "wire_18", "startTerminal": "comp_8_node", "endTerminal": "comp_3_negative", "points": [{ "x": 460, "y": 420 }, { "x": 460, "y": 420 }, { "x": 460, "y": 390 }, { "x": 460, "y": 390 }] },
+                    { "id": "wire_20", "startTerminal": "comp_8_node", "endTerminal": "comp_6_ch1_neg", "points": [{ "x": 460, "y": 420 }, { "x": 600, "y": 420 }, { "x": 600, "y": 355 }, { "x": 600, "y": 355 }] }
+                ]
+            }
         }
     ]
 };
