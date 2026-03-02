@@ -64,6 +64,7 @@ function init() {
     // Setup collapsible panel sections
     // Setup collapsible panel sections
     setupCollapsibleSections();
+    setupPanelDragResize();
 
     // ----------------------------------------------------
     // State Persistence
@@ -292,6 +293,61 @@ function setupCollapsibleSections() {
             section.classList.toggle('collapsed');
         });
     });
+}
+
+/**
+ * Setup drag-to-resize handles for left toolbar and right panel
+ */
+function setupPanelDragResize() {
+    const appMain = document.querySelector('.app-main');
+    const dragLeft = document.getElementById('drag-left');
+    const dragRight = document.getElementById('drag-right');
+
+    if (!appMain) return;
+
+    function startDrag(handle, side) {
+        return function (e) {
+            e.preventDefault();
+            handle.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            const startX = e.clientX;
+            const mainRect = appMain.getBoundingClientRect();
+            const cols = window.getComputedStyle(appMain).gridTemplateColumns.split(/\s+/);
+            const leftW = parseFloat(cols[0]);
+            const rightW = parseFloat(cols[4]);
+
+            function onMove(ev) {
+                const dx = ev.clientX - startX;
+                const totalW = mainRect.width;
+
+                if (side === 'left') {
+                    const newLeft = Math.max(60, Math.min(leftW + dx, totalW * 0.4));
+                    appMain.style.gridTemplateColumns =
+                        `${newLeft}px 4px 1fr 4px ${rightW}px`;
+                } else {
+                    const newRight = Math.max(200, Math.min(rightW - dx, totalW * 0.5));
+                    appMain.style.gridTemplateColumns =
+                        `${leftW}px 4px 1fr 4px ${newRight}px`;
+                }
+            }
+
+            function onUp() {
+                handle.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+    }
+
+    if (dragLeft) dragLeft.addEventListener('mousedown', startDrag(dragLeft, 'left'));
+    if (dragRight) dragRight.addEventListener('mousedown', startDrag(dragRight, 'right'));
 }
 
 /**
