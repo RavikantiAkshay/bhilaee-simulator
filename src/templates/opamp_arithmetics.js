@@ -44,33 +44,35 @@ export const opamp_arithmetics_template = {
             description: "Op-Amp configured as a difference amplifier (subtractor).",
             circuit: {
                 components: [
-                    { "id": "comp_1", "type": "voltage_source", "x": 240, "y": 240, "rotation": 0, "properties": { "voltage": 5, "type": "dc", "frequency": 50, "phase": 0 }, "state": {} },
-                    { "id": "comp_2", "type": "resistor", "x": 380, "y": 160, "rotation": 0, "properties": { "resistance": 1000 }, "state": {} },
-                    { "id": "comp_3", "type": "voltage_source", "x": 300, "y": 280, "rotation": 0, "properties": { "voltage": 1, "type": "dc", "frequency": 50, "phase": 0 }, "state": {} },
-                    { "id": "comp_4", "type": "resistor", "x": 380, "y": 220, "rotation": 0, "properties": { "resistance": 1000 }, "state": {} },
-                    { "id": "comp_5", "type": "junction", "x": 460, "y": 180, "rotation": 0, "properties": {}, "state": {} },
-                    { "id": "comp_6", "type": "opamp", "x": 540, "y": 180, "rotation": 0, "properties": { "openLoopGain": 100000, "gbp": 1000000, "rin": 2000000, "rout": 75, "offsetVoltage": 0, "cmrr": 90 }, "state": {} },
-                    { "id": "comp_7", "type": "resistor", "x": 540, "y": 100, "rotation": 0, "properties": { "resistance": 1000 }, "state": {} },
-                    { "id": "comp_8", "type": "junction", "x": 620, "y": 180, "rotation": 0, "properties": {}, "state": {} },
-                    { "id": "comp_9", "type": "ground", "x": 400, "y": 360, "rotation": 0, "properties": {}, "state": {} },
-                    { "id": "comp_10", "type": "junction", "x": 300, "y": 340, "rotation": 0, "properties": {}, "state": {} },
-                    { "id": "comp_11", "type": "oscilloscope", "x": 600, "y": 260, "rotation": 0, "properties": { "ch1Enabled": true, "ch2Enabled": false, "ch1Mode": "Voltage", "ch2Mode": "Voltage", "ch1Label": "CH1", "ch2Label": "CH2" }, "state": {} }
+                    { "id": "comp_31", "type": "voltage_source", "x": 240, "y": 260, "rotation": 0, "properties": { "voltage": 25, "type": "dc", "frequency": 50, "phase": 0 }, "state": {} },
+                    { "id": "comp_32", "type": "voltage_source", "x": 280, "y": 260, "rotation": 0, "properties": { "voltage": 5, "type": "dc", "frequency": 50, "phase": 0 }, "state": {} },
+                    { "id": "comp_33", "type": "opamp", "x": 480, "y": 180, "rotation": 0, "properties": { "openLoopGain": 100000, "gbp": 1000000, "rin": 2000000, "rout": 75, "offsetVoltage": 0, "cmrr": 90 }, "state": {} },
+                    { "id": "comp_34", "type": "junction", "x": 400, "y": 160, "rotation": 0, "properties": {}, "state": {} },
+                    { "id": "comp_35", "type": "junction", "x": 400, "y": 200, "rotation": 0, "properties": {}, "state": {} },
+                    { "id": "comp_36", "type": "resistor", "x": 340, "y": 200, "rotation": 0, "properties": { "resistance": 1000 }, "state": {} },
+                    { "id": "comp_37", "type": "resistor", "x": 340, "y": 160, "rotation": 0, "properties": { "resistance": 1000 }, "state": {} },
+                    { "id": "comp_38", "type": "ground", "x": 400, "y": 340, "rotation": 0, "properties": {}, "state": {} },
+                    { "id": "comp_39", "type": "resistor", "x": 400, "y": 260, "rotation": 90, "properties": { "resistance": 1000 }, "state": {} },
+                    { "id": "comp_40", "type": "resistor", "x": 480, "y": 100, "rotation": 0, "properties": { "resistance": 1000 }, "state": {} },
+                    { "id": "comp_41", "type": "junction", "x": 560, "y": 180, "rotation": 0, "properties": {}, "state": {} },
+                    { "id": "comp_42", "type": "oscilloscope", "x": 560, "y": 260, "rotation": 0, "properties": { "ch1Enabled": true, "ch2Enabled": false, "ch1Mode": "Voltage", "ch2Mode": "Voltage", "ch1Label": "CH1", "ch2Label": "CH2" }, "state": {} }
                 ],
                 wires: [
-                    { "id": "wire_2", "startTerminal": "comp_3_positive", "endTerminal": "comp_4_left", "points": [{ "x": 300, "y": 250 }, { "x": 300, "y": 250 }, { "x": 300, "y": 220 }, { "x": 350, "y": 220 }] },
-                    { "id": "wire_4", "startTerminal": "comp_1_positive", "endTerminal": "comp_2_left", "points": [{ "x": 240, "y": 210 }, { "x": 240, "y": 210 }, { "x": 240, "y": 160 }, { "x": 350, "y": 160 }] },
-                    { "id": "wire_6", "startTerminal": "comp_2_right", "endTerminal": "comp_5_node", "points": [{ "x": 410, "y": 160 }, { "x": 435, "y": 160 }, { "x": 435, "y": 180 }, { "x": 460, "y": 180 }] },
-                    { "id": "wire_8", "startTerminal": "comp_4_right", "endTerminal": "comp_5_node", "points": [{ "x": 410, "y": 220 }, { "x": 435, "y": 220 }, { "x": 435, "y": 180 }, { "x": 460, "y": 180 }] },
-                    { "id": "wire_11", "startTerminal": "comp_5_node", "endTerminal": "comp_6_in_neg", "points": [{ "x": 460, "y": 180 }, { "x": 460, "y": 180 }, { "x": 460, "y": 165 }, { "x": 510, "y": 165 }] },
-                    { "id": "wire_13", "startTerminal": "comp_5_node", "endTerminal": "comp_7_left", "points": [{ "x": 460, "y": 180 }, { "x": 460, "y": 180 }, { "x": 460, "y": 100 }, { "x": 510, "y": 100 }] },
-                    { "id": "wire_16", "startTerminal": "comp_7_right", "endTerminal": "comp_8_node", "points": [{ "x": 570, "y": 100 }, { "x": 620, "y": 100 }, { "x": 620, "y": 180 }, { "x": 620, "y": 180 }] },
-                    { "id": "wire_18", "startTerminal": "comp_6_out", "endTerminal": "comp_8_node", "points": [{ "x": 570, "y": 180 }, { "x": 595, "y": 180 }, { "x": 595, "y": 180 }, { "x": 620, "y": 180 }] },
-                    { "id": "wire_20", "startTerminal": "comp_3_negative", "endTerminal": "comp_10_node", "points": [{ "x": 300, "y": 310 }, { "x": 300, "y": 310 }, { "x": 300, "y": 340 }, { "x": 300, "y": 340 }] },
-                    { "id": "wire_23", "startTerminal": "comp_10_node", "endTerminal": "comp_9_ref", "points": [{ "x": 300, "y": 340 }, { "x": 350, "y": 340 }, { "x": 350, "y": 345 }, { "x": 400, "y": 345 }] },
-                    { "id": "wire_25", "startTerminal": "comp_10_node", "endTerminal": "comp_1_negative", "points": [{ "x": 300, "y": 340 }, { "x": 240, "y": 340 }, { "x": 240, "y": 270 }, { "x": 240, "y": 270 }] },
-                    { "id": "wire_27", "startTerminal": "comp_6_in_pos", "endTerminal": "comp_9_ref", "points": [{ "x": 510, "y": 195 }, { "x": 460, "y": 195 }, { "x": 460, "y": 345 }, { "x": 400, "y": 345 }] },
-                    { "id": "wire_29", "startTerminal": "comp_11_ch1_pos", "endTerminal": "comp_8_node", "points": [{ "x": 600, "y": 225 }, { "x": 620, "y": 225 }, { "x": 620, "y": 180 }, { "x": 620, "y": 180 }] },
-                    { "id": "wire_31", "startTerminal": "comp_11_ch1_neg", "endTerminal": "comp_9_ref", "points": [{ "x": 600, "y": 295 }, { "x": 500, "y": 295 }, { "x": 500, "y": 345 }, { "x": 400, "y": 345 }] }
+                    { "id": "wire_4", "startTerminal": "comp_36_right", "endTerminal": "comp_35_node", "points": [{ "x": 370, "y": 200 }, { "x": 385, "y": 200 }, { "x": 385, "y": 200 }, { "x": 400, "y": 200 }] },
+                    { "id": "wire_6", "startTerminal": "comp_36_left", "endTerminal": "comp_32_positive", "points": [{ "x": 310, "y": 200 }, { "x": 280, "y": 200 }, { "x": 280, "y": 230 }, { "x": 280, "y": 230 }] },
+                    { "id": "wire_8", "startTerminal": "comp_37_right", "endTerminal": "comp_34_node", "points": [{ "x": 370, "y": 160 }, { "x": 385, "y": 160 }, { "x": 385, "y": 160 }, { "x": 400, "y": 160 }] },
+                    { "id": "wire_10", "startTerminal": "comp_31_positive", "endTerminal": "comp_37_left", "points": [{ "x": 240, "y": 230 }, { "x": 240, "y": 230 }, { "x": 240, "y": 160 }, { "x": 310, "y": 160 }] },
+                    { "id": "wire_12", "startTerminal": "comp_32_negative", "endTerminal": "comp_38_ref", "points": [{ "x": 280, "y": 290 }, { "x": 280, "y": 290 }, { "x": 280, "y": 325 }, { "x": 400, "y": 325 }] },
+                    { "id": "wire_14", "startTerminal": "comp_31_negative", "endTerminal": "comp_38_ref", "points": [{ "x": 240, "y": 290 }, { "x": 240, "y": 290 }, { "x": 240, "y": 325 }, { "x": 400, "y": 325 }] },
+                    { "id": "wire_16", "startTerminal": "comp_39_left", "endTerminal": "comp_35_node", "points": [{ "x": 400, "y": 230 }, { "x": 400, "y": 230 }, { "x": 400, "y": 200 }, { "x": 400, "y": 200 }] },
+                    { "id": "wire_18", "startTerminal": "comp_39_right", "endTerminal": "comp_38_ref", "points": [{ "x": 400, "y": 290 }, { "x": 400, "y": 290 }, { "x": 400, "y": 325 }, { "x": 400, "y": 325 }] },
+                    { "id": "wire_20", "startTerminal": "comp_35_node", "endTerminal": "comp_33_in_pos", "points": [{ "x": 400, "y": 200 }, { "x": 425, "y": 200 }, { "x": 425, "y": 195 }, { "x": 450, "y": 195 }] },
+                    { "id": "wire_22", "startTerminal": "comp_34_node", "endTerminal": "comp_33_in_neg", "points": [{ "x": 400, "y": 160 }, { "x": 425, "y": 160 }, { "x": 425, "y": 165 }, { "x": 450, "y": 165 }] },
+                    { "id": "wire_24", "startTerminal": "comp_34_node", "endTerminal": "comp_40_left", "points": [{ "x": 400, "y": 160 }, { "x": 400, "y": 160 }, { "x": 400, "y": 100 }, { "x": 450, "y": 100 }] },
+                    { "id": "wire_26", "startTerminal": "comp_33_out", "endTerminal": "comp_41_node", "points": [{ "x": 510, "y": 180 }, { "x": 535, "y": 180 }, { "x": 535, "y": 180 }, { "x": 560, "y": 180 }] },
+                    { "id": "wire_28", "startTerminal": "comp_41_node", "endTerminal": "comp_40_right", "points": [{ "x": 560, "y": 180 }, { "x": 560, "y": 180 }, { "x": 560, "y": 100 }, { "x": 510, "y": 100 }] },
+                    { "id": "wire_30", "startTerminal": "comp_42_ch1_pos", "endTerminal": "comp_41_node", "points": [{ "x": 560, "y": 225 }, { "x": 560, "y": 225 }, { "x": 560, "y": 180 }, { "x": 560, "y": 180 }] },
+                    { "id": "wire_32", "startTerminal": "comp_42_ch1_neg", "endTerminal": "comp_38_ref", "points": [{ "x": 560, "y": 295 }, { "x": 560, "y": 295 }, { "x": 560, "y": 325 }, { "x": 400, "y": 325 }] }
                 ]
             }
         },
@@ -176,8 +178,28 @@ export const opamp_arithmetics_template = {
             name: "Antilog Amplifier",
             description: "Op-Amp configured as an antilogarithmic (exponential) amplifier.",
             circuit: {
-                components: [],
-                wires: []
+                components: [
+                    { "id": "comp_1", "type": "voltage_source", "x": 220, "y": 300, "rotation": 0, "properties": { "voltage": 9, "type": "dc", "frequency": 50, "phase": 0 }, "state": {} },
+                    { "id": "comp_2", "type": "resistor", "x": 440, "y": 160, "rotation": 0, "properties": { "resistance": 100000 }, "state": {} },
+                    { "id": "comp_3", "type": "opamp", "x": 440, "y": 240, "rotation": 0, "properties": { "openLoopGain": 100000, "gbp": 1000000, "rin": 2000000, "rout": 75, "offsetVoltage": 0, "cmrr": 90 }, "state": {} },
+                    { "id": "comp_4", "type": "junction", "x": 360, "y": 220, "rotation": 0, "properties": {}, "state": {} },
+                    { "id": "comp_5", "type": "ground", "x": 340, "y": 380, "rotation": 0, "properties": {}, "state": {} },
+                    { "id": "comp_6", "type": "diode", "x": 280, "y": 220, "rotation": 0, "properties": { "saturationCurrent": 1e-14, "emissionCoefficient": 1, "thermalVoltage": 0.02585 } },
+                    { "id": "comp_7", "type": "junction", "x": 520, "y": 240, "rotation": 90, "properties": {}, "state": {} },
+                    { "id": "comp_8", "type": "oscilloscope", "x": 520, "y": 300, "rotation": 0, "properties": { "ch1Enabled": true, "ch2Enabled": false, "ch1Mode": "Voltage", "ch2Mode": "Voltage", "ch1Label": "CH1", "ch2Label": "CH2" }, "state": {} }
+                ],
+                wires: [
+                    { "id": "wire_4", "startTerminal": "comp_4_node", "endTerminal": "comp_3_in_neg", "points": [{ "x": 360, "y": 220 }, { "x": 385, "y": 220 }, { "x": 385, "y": 225 }, { "x": 410, "y": 225 }] },
+                    { "id": "wire_8", "startTerminal": "comp_1_negative", "endTerminal": "comp_5_ref", "points": [{ "x": 220, "y": 330 }, { "x": 220, "y": 330 }, { "x": 220, "y": 365 }, { "x": 340, "y": 365 }] },
+                    { "id": "wire_10", "startTerminal": "comp_5_ref", "endTerminal": "comp_3_in_pos", "points": [{ "x": 340, "y": 365 }, { "x": 375, "y": 365 }, { "x": 375, "y": 255 }, { "x": 410, "y": 255 }] },
+                    { "id": "wire_14", "startTerminal": "comp_7_node", "endTerminal": "comp_3_out", "points": [{ "x": 520, "y": 240 }, { "x": 495, "y": 240 }, { "x": 495, "y": 240 }, { "x": 470, "y": 240 }] },
+                    { "id": "wire_18", "startTerminal": "comp_8_ch1_pos", "endTerminal": "comp_7_node", "points": [{ "x": 520, "y": 265 }, { "x": 520, "y": 265 }, { "x": 520, "y": 240 }, { "x": 520, "y": 240 }] },
+                    { "id": "wire_20", "startTerminal": "comp_5_ref", "endTerminal": "comp_8_ch1_neg", "points": [{ "x": 340, "y": 365 }, { "x": 520, "y": 365 }, { "x": 520, "y": 335 }, { "x": 520, "y": 335 }] },
+                    { "id": "wire_22", "startTerminal": "comp_4_node", "endTerminal": "comp_2_left", "points": [{ "x": 360, "y": 220 }, { "x": 360, "y": 220 }, { "x": 360, "y": 160 }, { "x": 410, "y": 160 }] },
+                    { "id": "wire_24", "startTerminal": "comp_2_right", "endTerminal": "comp_7_node", "points": [{ "x": 470, "y": 160 }, { "x": 520, "y": 160 }, { "x": 520, "y": 240 }, { "x": 520, "y": 240 }] },
+                    { "id": "wire_26", "startTerminal": "comp_6_cathode", "endTerminal": "comp_4_node", "points": [{ "x": 310, "y": 220 }, { "x": 335, "y": 220 }, { "x": 335, "y": 220 }, { "x": 360, "y": 220 }] },
+                    { "id": "wire_28", "startTerminal": "comp_6_anode", "endTerminal": "comp_1_positive", "points": [{ "x": 250, "y": 220 }, { "x": 220, "y": 220 }, { "x": 220, "y": 270 }, { "x": 220, "y": 270 }] }
+                ]
             }
         }
     ]

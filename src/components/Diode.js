@@ -109,7 +109,7 @@ export class Diode extends Component {
      */
     computeDiodeModel(Vd) {
         const Is = this.properties.saturationCurrent;
-        const n  = this.properties.emissionCoefficient;
+        const n = this.properties.emissionCoefficient;
         const Vt = this.properties.thermalVoltage;
         const nVt = n * Vt;
 
@@ -147,7 +147,7 @@ export class Diode extends Component {
      * @returns {number} Limited voltage
      */
     limitVoltage(VdNew, VdOld) {
-        const n  = this.properties.emissionCoefficient;
+        const n = this.properties.emissionCoefficient;
         const Vt = this.properties.thermalVoltage;
         const nVt = n * Vt;
         const Vcrit = nVt * Math.log(nVt / (Math.SQRT2 * this.properties.saturationCurrent));
