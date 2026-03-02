@@ -99,6 +99,21 @@ export class MNASolver {
                 // Solve
                 const newSolution = solveLinearSystem(G, I);
 
+                // Clamp OpAmp internal pole AND output node voltages to ±Vsat (output saturation)
+                for (const comp of components) {
+                    if (comp.constructor.name === 'OpAmp') {
+                        const vsat = comp.properties.saturationVoltage || 15;
+                        const nPole = this.getNodeIndex(comp.terminals[3]);
+                        const nOut = this.getNodeIndex(comp.terminals[2]);
+                        if (nPole !== null) {
+                            newSolution[nPole] = Math.max(-vsat, Math.min(vsat, newSolution[nPole]));
+                        }
+                        if (nOut !== null) {
+                            newSolution[nOut] = Math.max(-vsat, Math.min(vsat, newSolution[nOut]));
+                        }
+                    }
+                }
+
                 // Check convergence for NR
                 if (hasNonlinear) {
                     let maxDiff = 0;

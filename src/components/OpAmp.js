@@ -60,7 +60,8 @@ export class OpAmp extends Component {
             rin: 2e6,
             rout: 75,
             offsetVoltage: 0,
-            cmrr: 90
+            cmrr: 90,
+            saturationVoltage: 15
         };
     }
 
@@ -71,7 +72,8 @@ export class OpAmp extends Component {
             { name: 'rin', label: 'Input Resistance', type: 'number', unit: 'Ω', min: 1 },
             { name: 'rout', label: 'Output Resistance', type: 'number', unit: 'Ω', min: 0.001 },
             { name: 'offsetVoltage', label: 'Offset Voltage', type: 'number', unit: 'V' },
-            { name: 'cmrr', label: 'CMRR', type: 'number', unit: 'dB', min: 1 }
+            { name: 'cmrr', label: 'CMRR', type: 'number', unit: 'dB', min: 1 },
+            { name: 'saturationVoltage', label: 'Output Saturation (±V)', type: 'number', unit: 'V', min: 0.1 }
         ];
     }
 

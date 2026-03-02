@@ -322,6 +322,21 @@ export class TransientSolver {
 
             const newSolution = solveLinearSystem(G, I);
 
+            // Clamp OpAmp internal pole AND output node voltages to ±Vsat (output saturation)
+            for (const component of components) {
+                if (component.constructor.name === 'OpAmp') {
+                    const vsat = component.properties.saturationVoltage || 15;
+                    const nPole = this.getNodeIndex(component.terminals[3]);
+                    const nOut = this.getNodeIndex(component.terminals[2]);
+                    if (nPole !== null) {
+                        newSolution[nPole] = Math.max(-vsat, Math.min(vsat, newSolution[nPole]));
+                    }
+                    if (nOut !== null) {
+                        newSolution[nOut] = Math.max(-vsat, Math.min(vsat, newSolution[nOut]));
+                    }
+                }
+            }
+
             if (this.timePoints.length === 1 && iter === 0) {
                 console.log(`--- Integrator Debug [t=${this.time}] ---`);
                 G.print('Transient G Matrix:');
@@ -771,7 +786,9 @@ export class TransientSolver {
                 }
             } else if (component.constructor.name === 'OpAmp') {
                 const nPole = this.getNodeIndex(component.terminals[3]);
-                const vPole = nPole !== null ? solution[nPole] : 0;
+                const vsat = component.properties.saturationVoltage || 15;
+                let vPole = nPole !== null ? solution[nPole] : 0;
+                vPole = Math.max(-vsat, Math.min(vsat, vPole));
                 this.capacitorVoltages.set('__pole_' + component.id, vPole);
             }
         }
