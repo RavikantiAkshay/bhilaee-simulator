@@ -27,6 +27,9 @@ import { diode_rectifiers_template }
 import { opamp_arithmetics_template }
     from "./opamp_arithmetics.js";
 
+import { opamp_characteristics_template }
+    from "./opamp_characteristics.js";
+
 export const circuitTemplates = {
     "basic-ee-exp-1":
         power_factor_correction_template,
@@ -45,5 +48,7 @@ export const circuitTemplates = {
     "devices_and_circuits-exp3":
         diode_rectifiers_template,
     "devices_and_circuits-exp4":
-        opamp_arithmetics_template
+        opamp_arithmetics_template,
+    "devices_and_circuits-exp5":
+        opamp_characteristics_template
 };
