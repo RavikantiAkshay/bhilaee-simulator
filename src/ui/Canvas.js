@@ -38,6 +38,12 @@ export class Canvas {
         this.dragStart = { x: 0, y: 0 };
         this.dragOffset = { x: 0, y: 0 };
 
+        // Panning state
+        this.panning = false;
+        this.panStart = { x: 0, y: 0 };
+        this.panStartOffset = { x: 0, y: 0 };
+        this.spaceHeld = false;
+
         // Component placement
         this.placingComponent = null;
         this.placingComponentClass = null;
@@ -68,8 +74,17 @@ export class Canvas {
         this.svg.addEventListener('mouseleave', this.handleMouseUp.bind(this));
         this.svg.addEventListener('dblclick', this.handleDoubleClick.bind(this));
 
+        // Mouse wheel zoom
+        this.svg.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
+
         // Keyboard events
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                this.spaceHeld = false;
+                this.svg.style.cursor = '';
+            }
+        });
 
         // Prevent context menu on canvas
         this.svg.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -104,7 +119,26 @@ export class Canvas {
      * Handle mouse down
      */
     handleMouseDown(event) {
-        if (event.button !== 0) return; // Left click only
+        // Middle-click or right-click → start panning
+        if (event.button === 1 || event.button === 2) {
+            event.preventDefault();
+            this.panning = true;
+            this.panStart = { x: event.clientX, y: event.clientY };
+            this.panStartOffset = { x: this.panX, y: this.panY };
+            this.svg.style.cursor = 'grabbing';
+            return;
+        }
+
+        if (event.button !== 0) return; // Left click only from here
+
+        // Space + left-click → start panning
+        if (this.spaceHeld) {
+            this.panning = true;
+            this.panStart = { x: event.clientX, y: event.clientY };
+            this.panStartOffset = { x: this.panX, y: this.panY };
+            this.svg.style.cursor = 'grabbing';
+            return;
+        }
 
         const pos = this.getMousePosition(event);
         const snapped = this.snapToGrid(pos.x, pos.y);
@@ -147,6 +181,16 @@ export class Canvas {
      * Handle mouse move
      */
     handleMouseMove(event) {
+        // Panning
+        if (this.panning) {
+            const dx = event.clientX - this.panStart.x;
+            const dy = event.clientY - this.panStart.y;
+            this.panX = this.panStartOffset.x + dx;
+            this.panY = this.panStartOffset.y + dy;
+            this.updateZoom();
+            return;
+        }
+
         const pos = this.getMousePosition(event);
         const snapped = this.snapToGrid(pos.x, pos.y);
 
@@ -186,6 +230,13 @@ export class Canvas {
      * Handle mouse up
      */
     handleMouseUp(event) {
+        // End panning
+        if (this.panning) {
+            this.panning = false;
+            this.svg.style.cursor = this.spaceHeld ? 'grab' : '';
+            return;
+        }
+
         const pos = this.getMousePosition(event);
 
         // End dragging component
@@ -246,6 +297,29 @@ export class Canvas {
     }
 
     /**
+     * Handle mouse wheel for zoom (zoom centered on cursor)
+     */
+    handleWheel(event) {
+        event.preventDefault();
+
+        const rect = this.svg.getBoundingClientRect();
+        // Mouse position relative to the SVG container
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        // Determine zoom direction
+        const zoomFactor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+        const newZoom = Math.max(0.1, Math.min(this.zoom * zoomFactor, 5));
+
+        // Zoom-to-point: adjust pan so the point under the cursor stays fixed
+        this.panX = mouseX - (mouseX - this.panX) * (newZoom / this.zoom);
+        this.panY = mouseY - (mouseY - this.panY) * (newZoom / this.zoom);
+        this.zoom = newZoom;
+
+        this.updateZoom();
+    }
+
+    /**
      * Handle keyboard shortcuts
      */
     handleKeyDown(event) {
@@ -255,6 +329,13 @@ export class Canvas {
         }
 
         switch (event.key) {
+            case ' ':
+                if (!this.spaceHeld) {
+                    event.preventDefault();
+                    this.spaceHeld = true;
+                    this.svg.style.cursor = 'grab';
+                }
+                break;
             case 'Delete':
             case 'Backspace':
                 this.deleteSelected();
