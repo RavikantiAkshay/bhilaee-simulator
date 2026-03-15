@@ -24,14 +24,17 @@ import { transformer_test_template }
 import { diode_rectifiers_template }
     from "./diode_rectifiers.js";
 
-import { opamp_arithmetics_template }
+import { opamp_arithmetics_template, integrator_preset, differentiator_preset }
     from "./opamp_arithmetics.js";
 
-import { opamp_characteristics_template }
+import { opamp_characteristics_template, inverting_preset }
     from "./opamp_characteristics.js";
 
 import { active_filters_template, low_pass_preset, high_pass_preset }
     from "./active_filters.js";
+
+import { instrumentation_amplifier_template, instrumentation_amplifier_preset }
+    from "./instrumentation_amplifier.js";
 
 export const circuitTemplates = {
     "basic-ee-exp-1":
@@ -59,5 +62,11 @@ export const circuitTemplates = {
     "sensor_lab-exp1": {
         name: "Basic Active Filters",
         presets: [low_pass_preset, high_pass_preset]
-    }
+    },
+    "sensor_lab-exp2": {
+        name: "Sensor Lab 2: Op-Amp Applications",
+        presets: [integrator_preset, differentiator_preset, inverting_preset, instrumentation_amplifier_preset]
+    },
+    "sensor_lab-instrumentation":
+        instrumentation_amplifier_template
 };
