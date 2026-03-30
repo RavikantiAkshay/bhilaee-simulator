@@ -175,6 +175,25 @@
                     </div>
                     <div class="chart-container" id="scope-container"></div>
                 </div>
+
+                <!-- Sensor Overlay Controls (Floating top-right) -->
+                <div class="sensor-controls-overlay" id="sensor-controls-overlay" style="display: none;">
+                    <div class="sensor-button-group">
+                        <button class="btn btn-primary btn-sensor-play" id="btn-start-sensor">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                            Start Sensors
+                        </button>
+                        <button class="btn btn-secondary" id="btn-stop-sensor" disabled>
+                            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+                            Stop
+                        </button>
+                    </div>
+                    <button class="btn btn-accent btn-sensor-note" id="btn-note-reading" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        Note Reading (<span id="note-count">0</span>)
+                    </button>
+                    <div id="sensor-live-panel" class="sensor-live-panel" style="display: none;"></div>
+                </div>
             </section>
 
             <!-- Drag handle: canvas ↔ right panel -->

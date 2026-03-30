@@ -353,14 +353,14 @@ export class Component {
         // Label
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         label.setAttribute('class', 'component-label');
-        label.setAttribute('y', '-15');
+        label.setAttribute('y', this.getLabelOffset ? this.getLabelOffset() : '-15');
         label.textContent = this.getLabel();
         group.appendChild(label);
 
         // Value
         const value = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         value.setAttribute('class', 'component-value');
-        value.setAttribute('y', '25');
+        value.setAttribute('y', this.getValueOffset ? this.getValueOffset() : '25');
         value.textContent = this.getValueString();
         group.appendChild(value);
 

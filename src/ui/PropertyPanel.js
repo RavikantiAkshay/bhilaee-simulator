@@ -138,11 +138,67 @@ export class PropertyPanel {
             input.className = 'select-input';
             for (const opt of definition.options) {
                 const option = document.createElement('option');
-                option.value = opt;
-                option.textContent = opt.toUpperCase();
-                option.selected = component.properties[definition.name] === opt;
+                if (typeof opt === 'object' && opt.value !== undefined) {
+                    option.value = opt.value;
+                    option.textContent = opt.label || opt.value;
+                    option.selected = component.properties[definition.name] == opt.value;
+                } else {
+                    option.value = opt;
+                    option.textContent = String(opt).toUpperCase();
+                    option.selected = component.properties[definition.name] === opt;
+                }
                 input.appendChild(option);
             }
+        } else if (definition.type === 'range') {
+            // Range slider with live value display
+            const rangeWrapper = document.createElement('div');
+            rangeWrapper.className = 'range-wrapper';
+
+            input = document.createElement('input');
+            input.type = 'range';
+            input.className = 'range-input';
+            input.value = component.properties[definition.name];
+            if (definition.min !== undefined) input.min = definition.min;
+            if (definition.max !== undefined) input.max = definition.max;
+            if (definition.step !== undefined) input.step = definition.step;
+
+            const valueDisplay = document.createElement('span');
+            valueDisplay.className = 'range-value';
+            valueDisplay.textContent = component.properties[definition.name];
+
+            input.addEventListener('input', () => {
+                valueDisplay.textContent = input.value;
+            });
+
+            rangeWrapper.appendChild(input);
+            rangeWrapper.appendChild(valueDisplay);
+            field.appendChild(label);
+
+            if (definition.unit) {
+                const unitSpan = document.createElement('span');
+                unitSpan.className = 'input-unit range-unit';
+                unitSpan.textContent = definition.unit;
+                rangeWrapper.appendChild(unitSpan);
+            }
+
+            field.appendChild(rangeWrapper);
+
+            // Handle value change
+            const updateRangeValue = () => {
+                let value = parseFloat(input.value);
+                if (isNaN(value)) return;
+                component.setProperty(definition.name, value);
+                if (this.onPropertyChange) {
+                    this.onPropertyChange(component, definition.name, value);
+                }
+            };
+
+            input.addEventListener('input', updateRangeValue);
+            input.addEventListener('change', updateRangeValue);
+
+            input.id = `prop-${definition.name}`;
+            return field;
+
         } else if (definition.type === 'checkbox') {
             input = document.createElement('input');
             input.type = 'checkbox';

@@ -22,6 +22,11 @@ import { Load } from './Load.js';
 import { Oscilloscope } from './Oscilloscope.js';
 import { Diode } from './Diode.js';
 import { OpAmp } from './OpAmp.js';
+import { RTD } from './RTD.js';
+import { Thermistor } from './Thermistor.js';
+import { LVDT } from './LVDT.js';
+import { StrainGauge } from './StrainGauge.js';
+import { LoadCell } from './LoadCell.js';
 
 /**
  * List of all available components
@@ -42,7 +47,12 @@ export const COMPONENTS = [
     Load,
     Oscilloscope,
     Diode,
-    OpAmp
+    OpAmp,
+    RTD,
+    Thermistor,
+    LVDT,
+    StrainGauge,
+    LoadCell
 ];
 
 /**
@@ -96,4 +106,4 @@ export function getComponentByShortcut(key) {
 }
 
 // Re-export component classes for convenience
-export { Resistor, Capacitor, Inductor, Ground, VoltageSource, Junction, Ammeter, Voltmeter, Transformer, Wattmeter, ThreePhaseSource, Load, Oscilloscope, Diode };
+export { Resistor, Capacitor, Inductor, Ground, VoltageSource, Junction, Ammeter, Voltmeter, Transformer, Wattmeter, ThreePhaseSource, Load, Oscilloscope, Diode, OpAmp, RTD, Thermistor, LVDT, StrainGauge, LoadCell };

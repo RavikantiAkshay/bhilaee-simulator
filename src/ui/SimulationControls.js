@@ -46,6 +46,18 @@ export class SimulationControls {
         // State
         this.running = false;
 
+        // Sensor simulation state
+        this.sensorMode = false;
+        this.sensorAnimFrame = null;
+        this.sensorLastTime = null;
+        this.sensorElapsed = 0;
+        this.observationTable = [];
+        this.btnNoteReading = document.getElementById('btn-note-reading');
+        this.btnStartSensor = document.getElementById('btn-start-sensor');
+        this.btnStopSensor = document.getElementById('btn-stop-sensor');
+        this.sensorLivePanel = document.getElementById('sensor-live-panel');
+        this.sensorOverlay = document.getElementById('sensor-controls-overlay');
+
         // Callbacks
         this.onRun = null;
         this.onStop = null;
@@ -76,6 +88,17 @@ export class SimulationControls {
 
         if (this.scopeClose) {
             this.scopeClose.addEventListener('click', () => this.hideScope());
+        }
+
+        // Sensor buttons
+        if (this.btnStartSensor) {
+            this.btnStartSensor.addEventListener('click', () => this.startSensorSimulation());
+        }
+        if (this.btnStopSensor) {
+            this.btnStopSensor.addEventListener('click', () => this.stopSensorSimulation());
+        }
+        if (this.btnNoteReading) {
+            this.btnNoteReading.addEventListener('click', () => this.noteReading());
         }
     }
 
@@ -966,6 +989,10 @@ export class SimulationControls {
      */
     stop() {
         this.running = false;
+        if (this.sensorMode) {
+            this.stopSensorSimulation();
+            return;
+        }
         this.updateButtonStates();
         this.showOutput('Simulation stopped', 'info');
 
@@ -1127,4 +1154,431 @@ export class SimulationControls {
 
         this.showOutput(html, 'success');
     }
+
+    // ============================
+    // Sensor Simulation Subsystem
+    // ============================
+
+    /**
+     * Find all sensor components in the circuit.
+     */
+    findSensors() {
+        const sensors = [];
+        for (const comp of this.circuit.components.values()) {
+            if (comp.isSensor) {
+                sensors.push(comp);
+            }
+        }
+        return sensors;
+    }
+
+    /**
+     * Check if circuit contains sensors and show/hide sensor controls.
+     */
+    detectSensorMode() {
+        const sensors = this.findSensors();
+        this.sensorMode = sensors.length > 0;
+
+        // Toggle visibility of sensor overlay
+        if (this.sensorOverlay) {
+            this.sensorOverlay.style.display = this.sensorMode ? 'flex' : 'none';
+        } else {
+            // Fallback for individual buttons if overlay isn't present
+            if (this.btnStartSensor) this.btnStartSensor.style.display = this.sensorMode ? 'inline-flex' : 'none';
+            if (this.btnStopSensor) this.btnStopSensor.style.display = this.sensorMode ? 'inline-flex' : 'none';
+            if (this.btnNoteReading) this.btnNoteReading.style.display = this.sensorMode ? 'inline-flex' : 'none';
+        }
+
+        return this.sensorMode;
+    }
+
+    /**
+     * Start the continuous sensor simulation loop.
+     */
+    startSensorSimulation() {
+        const sensors = this.findSensors();
+        if (sensors.length === 0) {
+            this.showOutput('No sensor components found in circuit.', 'error');
+            return;
+        }
+
+        // Validate circuit
+        const validation = this.circuit.validate();
+        if (!validation.valid) {
+            this.showErrors(validation.errors);
+            return;
+        }
+
+        this.running = true;
+        this.sensorMode = true;
+        this.sensorLastTime = performance.now();
+        this.sensorElapsed = 0;
+        this.observationTable = [];
+
+        // Reset sensors
+        sensors.forEach(s => { if (s.resetSensor) s.resetSensor(); });
+
+        // Update button states
+        if (this.btnStartSensor) this.btnStartSensor.disabled = true;
+        if (this.btnStopSensor) this.btnStopSensor.disabled = false;
+        if (this.btnNoteReading) this.btnNoteReading.disabled = false;
+        if (this.btnRun) this.btnRun.disabled = true;
+
+        this.showOutput('<div class="sensor-running">🟢 Sensor simulation running...</div>', 'info');
+
+        // Show live panel
+        if (this.sensorLivePanel) this.sensorLivePanel.style.display = 'block';
+
+        // Start animation loop
+        this._sensorLoop();
+    }
+
+    /**
+     * The continuous simulation frame.
+     */
+    _sensorLoop() {
+        if (!this.running || !this.sensorMode) return;
+
+        const now = performance.now();
+        const dt = Math.min((now - this.sensorLastTime) / 1000, 0.1); // seconds, capped at 100ms
+        this.sensorLastTime = now;
+        this.sensorElapsed += dt;
+
+        const sensors = this.findSensors();
+
+        // Get excitation/heater voltage for each sensor from the circuit
+        let inputVoltages = new Map();
+        try {
+            const solver = new MNASolver(this.circuit);
+            
+            // First solve DC to get base values
+            let dcResult = null;
+            try { dcResult = solver.solveDC(); } catch (e) {}
+
+            // Check if there are any AC sources
+            let hasAC = false;
+            let acFreq = 50;
+            for (const comp of this.circuit.components.values()) {
+                if (comp.constructor.name === 'VoltageSource' && comp.properties.type === 'ac') {
+                    hasAC = true;
+                    acFreq = comp.properties.frequency || 50;
+                    break;
+                }
+            }
+
+            // Solve AC if needed
+            let acResult = null;
+            if (hasAC) {
+                try { acResult = solver.solveAC(acFreq); } catch (e) {}
+            }
+
+            for (const sensor of sensors) {
+                let excitationVoltage = 0;
+                if (sensor.terminals.length >= 2) { // 2 input terminals at index 0 and 1
+                    const inPos = sensor.terminals[0];
+                    const inNeg = sensor.terminals[1];
+                    const nPos = solver.getNodeId(inPos);
+                    const nNeg = solver.getNodeId(inNeg);
+
+                    let vPosDc = 0, vNegDc = 0;
+                    if (dcResult && dcResult.success && dcResult.nodeVoltages) {
+                        vPosDc = nPos ? (dcResult.nodeVoltages.get(nPos) || 0) : 0;
+                        vNegDc = nNeg ? (dcResult.nodeVoltages.get(nNeg) || 0) : 0;
+                    }
+                    
+                    let vPosAcMag = 0, vNegAcMag = 0;
+                    if (acResult && acResult.success && acResult.nodeVoltages) {
+                        const cPos = nPos ? (acResult.nodeVoltages.get(nPos)) : null;
+                        const cNeg = nNeg ? (acResult.nodeVoltages.get(nNeg)) : null;
+                        vPosAcMag = cPos ? cPos.magnitude() : 0;
+                        vNegAcMag = cNeg ? cNeg.magnitude() : 0;
+                    }
+
+                    const vDc = Math.abs(vPosDc - vNegDc);
+                    const vAc = Math.abs(vPosAcMag - vNegAcMag);
+                    excitationVoltage = Math.max(vDc, vAc);
+                }
+
+                inputVoltages.set(sensor.id, excitationVoltage);
+
+                // Update instrument readings using DC result (or 0 if failed)
+                if (dcResult && dcResult.success) {
+                    this._updateInstrumentReadings(solver, dcResult);
+                }
+            }
+        } catch (e) {
+            console.warn('Sensor loop MNA solve failed:', e.message);
+        }
+
+        // Update each sensor
+        for (const sensor of sensors) {
+            const voltage = inputVoltages.get(sensor.id) || 0;
+            sensor.updateEnvironment(dt, voltage);
+            // Update the SVG display
+            if (sensor.element) {
+                sensor.element.innerHTML = '';
+                const bodyHtml = sensor.renderBody();
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg">${bodyHtml}</svg>`;
+                const svgContent = tempDiv.querySelector('svg');
+                while (svgContent && svgContent.firstChild) {
+                    sensor.element.appendChild(svgContent.firstChild);
+                }
+                // Re-add terminals
+                for (const terminal of sensor.terminals) {
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('class', 'terminal');
+                    circle.setAttribute('data-terminal', terminal.name);
+                    circle.setAttribute('cx', terminal.offsetX);
+                    circle.setAttribute('cy', terminal.offsetY);
+                    circle.setAttribute('r', '4');
+                    sensor.element.appendChild(circle);
+                }
+                // Re-add label
+                const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                label.setAttribute('class', 'component-label');
+                label.setAttribute('y', sensor.getLabelOffset ? sensor.getLabelOffset() : '-15');
+                label.textContent = sensor.getLabel();
+                sensor.element.appendChild(label);
+
+                // Re-add value display
+                const value = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                value.setAttribute('class', 'component-value');
+                value.setAttribute('y', sensor.getValueOffset ? sensor.getValueOffset() : '25');
+                value.textContent = sensor.getValueString();
+                sensor.element.appendChild(value);
+            }
+        }
+
+        // Update live panel every 2.0 seconds for readability
+        // Force an immediate update on the very first frame
+        if (this.sensorDataTimer === undefined) {
+            this.sensorDataTimer = 2.0; 
+        } else {
+            this.sensorDataTimer += dt;
+        }
+
+        if (this.sensorDataTimer >= 2.0) {
+            this._updateSensorLivePanel(sensors);
+            this.sensorDataTimer = 0;
+        }
+
+        // Schedule next frame
+        this.sensorAnimFrame = requestAnimationFrame(() => this._sensorLoop());
+    }
+
+    /**
+     * Update instrument readings (ammeters, voltmeters) from a DC solve result.
+     */
+    _updateInstrumentReadings(solver, result) {
+        for (const comp of this.circuit.components.values()) {
+            if (comp.constructor.name === 'Ammeter') {
+                const current = result.branchCurrents.get(comp.id);
+                if (current !== undefined) comp.setCurrent(Math.abs(current));
+            }
+            if (comp.constructor.name === 'Voltmeter') {
+                const n1Id = solver.getNodeId(comp.terminals[0]);
+                const n2Id = solver.getNodeId(comp.terminals[1]);
+                let v1 = 0, v2 = 0;
+                if (n1Id && result.nodeVoltages.has(n1Id)) v1 = result.nodeVoltages.get(n1Id);
+                if (n2Id && result.nodeVoltages.has(n2Id)) v2 = result.nodeVoltages.get(n2Id);
+                comp.setVoltage(v1 - v2);
+            }
+        }
+    }
+
+    /**
+     * Update the live sensor readings panel.
+     */
+    _updateSensorLivePanel(sensors) {
+        if (!this.sensorLivePanel) return;
+
+        let html = `<div class="sensor-live-header">🔴 LIVE — ${this.sensorElapsed.toFixed(1)}s</div>`;
+
+        for (const sensor of sensors) {
+            const obs = sensor.getObservation();
+            html += `<div class="sensor-live-row">`;
+            html += `<span class="sensor-live-name">${sensor.constructor.displayName}</span>`;
+            for (let i = 0; i < obs.headers.length; i++) {
+                html += `<span class="sensor-live-val">${obs.headers[i]}: <b>${obs.values[i]}</b></span>`;
+            }
+            html += `</div>`;
+        }
+
+        this.sensorLivePanel.innerHTML = html;
+    }
+
+    /**
+     * Note the current sensor readings for the observation table.
+     */
+    noteReading() {
+        const sensors = this.findSensors();
+        if (sensors.length === 0) return;
+
+        const row = { time: this.sensorElapsed.toFixed(2), readings: [] };
+        for (const sensor of sensors) {
+            const obs = sensor.getObservation();
+            row.readings.push({
+                sensorName: sensor.constructor.displayName,
+                headers: obs.headers,
+                values: obs.values
+            });
+        }
+        this.observationTable.push(row);
+
+        // Flash feedback
+        if (this.btnNoteReading) {
+            this.btnNoteReading.classList.add('note-flash');
+            setTimeout(() => this.btnNoteReading.classList.remove('note-flash'), 400);
+        }
+
+        // Update count display
+        const noteCountSpan = document.getElementById('note-count');
+        if (noteCountSpan) {
+            noteCountSpan.textContent = this.observationTable.length;
+        }
+
+        this.showOutput(
+            `<div class="sensor-running">🟢 Sensor simulation running... (${this.observationTable.length} readings noted)</div>`,
+            'info'
+        );
+    }
+
+    /**
+     * Stop the continuous sensor simulation and display observations.
+     */
+    stopSensorSimulation() {
+        this.running = false;
+        this.sensorMode = false;
+        this.sensorDataTimer = undefined;
+
+        if (this.sensorAnimFrame) {
+            cancelAnimationFrame(this.sensorAnimFrame);
+            this.sensorAnimFrame = null;
+        }
+
+        // Update buttons
+        if (this.btnStartSensor) this.btnStartSensor.disabled = false;
+        if (this.btnStopSensor) this.btnStopSensor.disabled = true;
+        if (this.btnNoteReading) this.btnNoteReading.disabled = true;
+        if (this.btnRun) this.btnRun.disabled = false;
+
+        // Hide live panel
+        if (this.sensorLivePanel) this.sensorLivePanel.style.display = 'none';
+
+        // Display observation table
+        if (this.observationTable.length > 0) {
+            this._displayObservationTable();
+        } else {
+            this.showOutput('Sensor simulation stopped. No readings were noted.', 'info');
+        }
+
+        this.updateButtonStates();
+    }
+
+    /**
+     * Display the accumulated observation table.
+     */
+    _displayObservationTable() {
+        if (this.observationTable.length === 0) return;
+
+        // Collect all unique headers across sensors
+        const firstRow = this.observationTable[0];
+        let allHeaders = ['Time (s)'];
+        for (const reading of firstRow.readings) {
+            for (const h of reading.headers) {
+                allHeaders.push(`${reading.sensorName}: ${h}`);
+            }
+        }
+
+        let html = '<div class="observation-table-wrapper">';
+        html += '<h4>📋 Observation Table</h4>';
+        html += '<table class="observation-table"><thead><tr>';
+        html += allHeaders.map(h => `<th>${h}</th>`).join('');
+        html += '</tr></thead><tbody>';
+
+        for (const row of this.observationTable) {
+            html += '<tr>';
+            html += `<td>${row.time}</td>`;
+            for (const reading of row.readings) {
+                for (const val of reading.values) {
+                    html += `<td>${val}</td>`;
+                }
+            }
+            html += '</tr>';
+        }
+
+        html += '</tbody></table>';
+
+        html += `
+            <div style="margin-top: 10px; display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-small" id="btn-download-observations" title="Download CSV">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download CSV
+                </button>
+                <button class="btn btn-danger btn-small" style="background: var(--error-bg); color: var(--error-text); border: 1px solid var(--error-border);" id="btn-clear-table" title="Clear Table">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    Clear Table
+                </button>
+            </div>
+        `;
+        html += '</div>';
+
+        this.showOutput(html, 'success');
+
+        // Attach download handler
+        setTimeout(() => {
+            const dlBtn = document.getElementById('btn-download-observations');
+            if (dlBtn) {
+                dlBtn.addEventListener('click', () => this._downloadObservationsCSV(allHeaders));
+            }
+            const btnClear = document.getElementById('btn-clear-table');
+            if (btnClear) {
+                btnClear.onclick = () => {
+                    this.observationTable = [];
+                    const noteCountSpan = document.getElementById('note-count');
+                    if (noteCountSpan) noteCountSpan.textContent = "0";
+                    this.showOutput('Table cleared.', 'info');
+                };
+            }
+        }, 50);
+    }
+
+    /**
+     * Download observations as CSV.
+     */
+    _downloadObservationsCSV(headers) {
+        let csv = headers.join(',') + '\n';
+        for (const row of this.observationTable) {
+            let line = [row.time];
+            for (const reading of row.readings) {
+                line.push(...reading.values);
+            }
+            csv += line.join(',') + '\n';
+        }
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sensor_observations_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
+/**
+ * Helper: synchronous access to MNASolver (already imported at top of file).
+ */
+function await_import_mna() {
+    return { MNASolver };
 }

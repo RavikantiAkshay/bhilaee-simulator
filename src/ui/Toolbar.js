@@ -36,6 +36,12 @@ const CATEGORIES = [
         label: 'Instruments',
         icon: '📊',
         types: ['ammeter', 'voltmeter', 'wattmeter', 'oscilloscope']
+    },
+    {
+        id: 'sensors',
+        label: 'Sensors',
+        icon: '🌡️',
+        types: ['rtd', 'thermistor', 'lvdt', 'strain_gauge', 'load_cell']
     }
 ];
 

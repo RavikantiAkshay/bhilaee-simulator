@@ -1276,5 +1276,72 @@ body {
     margin: 0;
     color: var(--text-secondary);
     font-size: 0.9rem;
-    line-height: 1.4;
+}
+
+/* --- Sensor UI Controls Overlay --- */
+.sensor-controls-overlay {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    background: rgba(10, 15, 26, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-md);
+    min-width: 280px;
+}
+.sensor-button-group {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+.sensor-controls-overlay .btn {
+    padding: 8px 12px;
+    font-size: var(--font-size-sm);
+    justify-content: center;
+    flex: 1;
+}
+
+.sensor-live-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-secondary);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-sm);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.sensor-live-header {
+    font-weight: bold;
+    color: var(--accent-primary);
+    margin-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--border-secondary);
+    padding-bottom: 4px;
+}
+
+.sensor-live-row {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    padding: var(--spacing-xs);
+    border-radius: 4px;
+}
+
+.sensor-live-name {
+    color: var(--accent-secondary);
+    font-weight: 600;
+}
+
+.sensor-live-val {
+    margin-left: var(--spacing-sm);
 }

@@ -50,6 +50,7 @@ function init() {
     const simulationPanelElement = document.getElementById('simulation-panel');
     if (simulationPanelElement) {
         simulationControls = new SimulationControls(simulationPanelElement, circuitGraph);
+        simulationControls.detectSensorMode(); // Check initial state
     }
 
     // Expose globals for dynamic reloading logic in presets
@@ -114,9 +115,10 @@ function init() {
 
     // Listen for circuit changes (topology)
     circuitGraph.onChange = (type, data) => {
-        // console.log('Circuit changed:', type);
         // Auto-save disabled per user request
-        // stateManager.autosave(circuitGraph);
+        if (simulationControls) {
+            simulationControls.detectSensorMode();
+        }
         updateStatus(); // Ensure UI status updates
     };
 
@@ -134,6 +136,11 @@ function init() {
 
     // Update status bar
     updateStatus();
+    
+    // Detect sensors on initial load
+    if (simulationControls) {
+        simulationControls.detectSensorMode();
+    }
 
     console.log('✅ Circuit Simulator ready!');
 }
