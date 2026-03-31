@@ -36,6 +36,10 @@ import { active_filters_template, low_pass_preset, high_pass_preset }
 import { instrumentation_amplifier_template, instrumentation_amplifier_preset }
     from "./instrumentation_amplifier.js";
 
+import { lvdt_template } from "./lvdt.js";
+import { strain_gauge_template } from "./strain_gauge.js";
+import { load_cell_template } from "./load_cell.js";
+
 export const circuitTemplates = {
     "basic-ee-exp-1":
         power_factor_correction_template,
@@ -68,5 +72,11 @@ export const circuitTemplates = {
         presets: [integrator_preset, differentiator_preset, inverting_preset, instrumentation_amplifier_preset]
     },
     "sensor_lab-instrumentation":
-        instrumentation_amplifier_template
+        instrumentation_amplifier_template,
+    "sensor_lab-lvdt":
+        lvdt_template,
+    "sensor_lab-strain_gauge":
+        strain_gauge_template,
+    "sensor_lab-load_cell":
+        load_cell_template
 };
