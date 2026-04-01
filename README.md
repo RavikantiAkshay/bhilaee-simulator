@@ -1,6 +1,6 @@
 # Bhilai EE Circuit Simulator
 
-A browser-based circuit simulator for electrical engineering lab experiments. Built with **zero dependencies** — pure HTML, CSS, and JavaScript using ES6 modules. Supports DC, AC, and transient analysis with real-time oscilloscope visualization and pre-built experiment templates.
+A browser-based circuit simulator for electrical engineering lab experiments. Built with **zero dependencies** — pure HTML, CSS, and JavaScript using ES6 modules. Supports DC, AC, and transient analysis with real-time oscilloscope visualization and pre-built experiment templates across three labs: Basic EE, Devices & Circuits, and Sensor Lab.
 
 **Live →** [bhilaee-simulator.vercel.app](https://bhilaee-simulator.vercel.app)
 **Companion App →** [Bhilai EE Labs Guide](https://bhilaee-labs.vercel.app) · [Repository](https://github.com/RavikantiAkshay/basic-lab-guide)
@@ -67,7 +67,7 @@ A browser-based circuit simulator for electrical engineering lab experiments. Bu
 
 ## Components
 
-15 electrical components, each rendered as SVG with configurable properties:
+15+ electrical components, each rendered as SVG with configurable properties:
 
 | Component | Type Key | Shortcut | Terminals | Key Properties |
 |-----------|----------|:--------:|-----------|----------------|
@@ -204,6 +204,14 @@ export const circuitTemplates = {
 | `devices_and_circuits-exp4` | Op-Amp Arithmetics | DnC | DC | 6 |
 | `devices_and_circuits-exp5` | Op-Amp Characteristics | DnC | Transient | 2 |
 | `devices_and_circuits-exp6` | Active Filters | DnC | AC | 3 |
+| `sensor_lab-exp1` | Active Filters (LP + HP) | Sensor Lab | AC | 2 |
+| `sensor_lab-exp2` | Op-Amp Applications | Sensor Lab | DC | 4 |
+| `sensor_lab-instrumentation` | Instrumentation Amplifier | Sensor Lab | DC | 1 |
+| `sensor_lab-thermistor` | Thermistor Characteristics | Sensor Lab | Sensor | 1 |
+| `sensor_lab-rtd` | RTD (Pt-100) Characteristics | Sensor Lab | Sensor | 1 |
+| `sensor_lab-lvdt` | LVDT Displacement | Sensor Lab | Sensor | 1 |
+| `sensor_lab-strain_gauge` | Strain Gauge | Sensor Lab | Sensor | 1 |
+| `sensor_lab-load_cell` | Load Cell Characteristics | Sensor Lab | Sensor | 1 |
 
 ---
 
@@ -297,17 +305,23 @@ https://bhilaee-simulator.vercel.app/?expId=devices_and_circuits-exp4&preset=sum
     │   └── Matrix.js           # Real matrix utilities (LU decomposition)
     ├── templates/
     │   ├── index.js                                # Template registry
-    │   ├── power_factor_correction.js
-    │   ├── verification_of_superposition_theorem.js
-    │   ├── verification_of_thevenin_theorem.js
-    │   ├── transient_response_rlc.js
-    │   ├── oc_sc_test_single_phase_transformer.js
-    │   ├── three_phase_connections.js
-    │   ├── transformer_test.js
-    │   ├── diode_rectifiers.js
-    │   ├── opamp_arithmetics.js
-    │   ├── opamp_characteristics.js
-    │   └── active_filters.js
+    │   ├── power_factor_correction.js              # Basic EE Exp 1
+    │   ├── verification_of_superposition_theorem.js # Basic EE Exp 2
+    │   ├── verification_of_thevenin_theorem.js      # Basic EE Exp 3
+    │   ├── transient_response_rlc.js               # Basic EE Exp 4
+    │   ├── oc_sc_test_single_phase_transformer.js   # Basic EE Exp 5
+    │   ├── three_phase_connections.js               # Basic EE Exp 6
+    │   ├── transformer_test.js                      # Basic EE Exp 7
+    │   ├── diode_rectifiers.js                      # DnC Exp 3
+    │   ├── opamp_arithmetics.js                     # DnC Exp 4
+    │   ├── opamp_characteristics.js                 # DnC Exp 5
+    │   ├── active_filters.js                        # DnC Exp 6 / Sensor Exp 1
+    │   ├── instrumentation_amplifier.js             # Sensor Lab
+    │   ├── thermistor.js                            # Sensor Lab Exp 3
+    │   ├── rtd.js                                   # Sensor Lab Exp 4
+    │   ├── lvdt.js                                  # Sensor Lab Exp 7
+    │   ├── strain_gauge.js                          # Sensor Lab Exp 8
+    │   └── load_cell.js                             # Sensor Lab Exp 9
     ├── ui/
     │   ├── Canvas.js               # SVG canvas — drag, drop, select, wire
     │   ├── Toolbar.js              # Component palette & keyboard shortcuts
