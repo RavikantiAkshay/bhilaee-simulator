@@ -172,6 +172,24 @@ function setupHeaderButtons() {
     document.getElementById('btn-load')?.addEventListener('click', () => {
         loadCircuit();
     });
+
+    // Export circuit as high-quality image (PNG)
+    document.getElementById('btn-export-image')?.addEventListener('click', () => {
+        if (canvas) {
+            // Default to PNG as requested by user
+            canvas.exportAsImage('png');
+
+            // Visual feedback
+            const btn = document.getElementById('btn-export-image');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-secondary)" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            `;
+            setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+        }
+    });
 }
 
 /**

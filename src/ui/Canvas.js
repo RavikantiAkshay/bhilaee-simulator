@@ -706,4 +706,196 @@ export class Canvas {
             this.onComponentCountChange(this.circuit.getComponentCount());
         }
     }
+
+    /**
+     * Export the current circuit as a high-resolution, professional PNG or SVG.
+     * Overhauls aesthetics for a "clean" schematic look.
+     * @param {string} format - 'svg' or 'png'
+     */
+    async exportAsImage(format = 'png') {
+        try {
+            // 1. Calculate bounding box of active circuit content
+            // We force a layout recalc to ensure getBBox is accurate
+            const componentsBBox = this.componentsLayer.getBBox();
+            const wiresBBox = this.wiresLayer.getBBox();
+
+            if (this.circuit.getComponentCount() === 0 && this.circuit.wires.size === 0) {
+                alert("Nothing to export! The canvas is empty.");
+                return;
+            }
+
+            // Union of bounding boxes
+            const x = Math.min(componentsBBox.x, wiresBBox.x);
+            const y = Math.min(componentsBBox.y, wiresBBox.y);
+            const w = Math.max(componentsBBox.x + componentsBBox.width, wiresBBox.x + wiresBBox.width) - x;
+            const h = Math.max(componentsBBox.y + componentsBBox.height, wiresBBox.y + wiresBBox.height) - y;
+
+            // Professional padding
+            const padding = 80;
+            const exportX = x - padding;
+            const exportY = y - padding;
+            const exportW = w + padding * 2;
+            const exportH = h + padding * 2;
+
+            // 2. Clone the SVG and prepare for standalone use
+            const clone = this.svg.cloneNode(true);
+            clone.setAttribute('viewBox', `${exportX} ${exportY} ${exportW} ${exportH}`);
+            
+            // Set scale for high-res (2x)
+            const exportScale = 2;
+            clone.setAttribute('width', exportW * exportScale);
+            clone.setAttribute('height', exportH * exportScale);
+
+            // Remove clutter layers
+            const unwanted = clone.querySelectorAll('.grid-background, #interaction-layer, defs pattern');
+            unwanted.forEach(el => el.remove());
+
+            // Reset view transforms on content layers
+            const layers = clone.querySelectorAll('.components-layer, .wires-layer');
+            layers.forEach(layer => {
+                layer.style.transform = 'none';
+                layer.removeAttribute('transform');
+            });
+
+            // 3. Inject Professional "WOW" CSS
+            const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+            style.textContent = `
+                :root {
+                    --bg-export: #020617;
+                    --stroke-comp: #38bdf8;
+                    --fill-comp: rgba(56, 189, 248, 0.15);
+                    --stroke-wire: #38bdf8;
+                    --glow-wire: rgba(56, 189, 248, 0.3);
+                    --text-main: #f8fafc;
+                    --text-sub: #94a3b8;
+                }
+                svg { 
+                    background-color: var(--bg-export); 
+                    font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+                }
+                
+                /* Components - Base Style */
+                .component-group { 
+                    stroke: var(--stroke-comp); 
+                    fill: none;
+                }
+                
+                .component-group .component-body { 
+                    fill: var(--fill-comp); 
+                    stroke: var(--stroke-comp); 
+                    stroke-width: 2.5; 
+                }
+                
+                /* Wires - Sharp & Connected */
+                .wire { 
+                    fill: none; 
+                    stroke: var(--stroke-wire); 
+                    stroke-width: 2.5; 
+                    stroke-linecap: round;
+                    stroke-linejoin: round;
+                    filter: drop-shadow(0 0 1.5px var(--glow-wire));
+                }
+                
+                /* Terminals - Tiny solid dots to fill any gaps */
+                .component-group .terminal { 
+                    display: block;
+                    fill: var(--stroke-comp);
+                    stroke: none;
+                    r: 1.5px !important; /* Force a tiny sharp dot */
+                }
+                
+                /* Symbols (+, -, waves, etc.) */
+                .component-group line, 
+                .component-group path:not(.component-body):not(.wire), 
+                .component-group circle:not(.terminal) {
+                    stroke: var(--stroke-comp);
+                    stroke-width: 2;
+                    fill: none;
+                }
+                
+                /* Typography */
+                .component-group text,
+                .component-group .component-label { 
+                    fill: var(--text-main); 
+                    stroke: none;
+                    font-size: 11px; 
+                    font-weight: 700; 
+                    text-anchor: middle; 
+                }
+                .component-group .component-value { 
+                    fill: var(--text-sub); 
+                    stroke: none;
+                    font-size: 9px; 
+                    font-weight: 500; 
+                    text-anchor: middle; 
+                }
+                
+                .component-stroke { stroke: var(--stroke-comp); stroke-width: 2.5; }
+                * { vector-effect: non-scaling-stroke; }
+            `;
+            clone.appendChild(style);
+
+            // 4. Serialize and Export
+            const svgData = new XMLSerializer().serializeToString(clone);
+
+            if (format === 'svg') {
+                this._downloadFile(svgData, 'image/svg+xml', `circuit_${Date.now()}.svg`);
+            } else {
+                // High-res PNG
+                await this._exportToPNG(svgData, exportW * exportScale, exportH * exportScale);
+            }
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert('Export failed. Please check your circuit for invalid components.');
+        }
+    }
+
+    /**
+     * Internal helper to render SVG to a canvas and download as PNG
+     */
+    async _exportToPNG(svgData, width, height) {
+        return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = width;
+            canvas.height = height;
+
+            const img = new Image();
+            img.onload = () => {
+                // Ensure a solid background for PNG
+                ctx.fillStyle = '#020617';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                canvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `circuit_export_${new Date().toISOString().slice(0, 10)}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    resolve();
+                }, 'image/png', 1.0);
+            };
+            img.onerror = reject;
+            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgData);
+        });
+    }
+
+    /**
+     * Download a string as a file
+     */
+    _downloadFile(content, type, filename) {
+        const blob = new Blob([content], { type: `${type};charset=utf-8` });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 }
